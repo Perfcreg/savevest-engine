@@ -30,7 +30,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare email: string
 
-  @column()
+  @column({serializeAs: null})
   declare password: string
 
   @column()
@@ -72,7 +72,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare fa : boolean
 
-  @column()
+  @column({serializeAs: null})
   declare isActive : boolean
 
   @column()

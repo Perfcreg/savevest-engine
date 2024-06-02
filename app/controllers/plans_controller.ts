@@ -16,7 +16,7 @@ export default class PlansController {
     const userPlans = await Plan.findByOrFail('user_id', user.id)
     return response.status(200).json(userPlans)
   }
-
+  
 
   /**
   * @create

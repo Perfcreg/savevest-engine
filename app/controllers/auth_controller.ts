@@ -14,6 +14,7 @@ import User from '#models/user'
 import Wallet from '#models/wallet'
 export default class AuthController {
 
+  
   /**
   * @register
   * @description User registration endpoint.

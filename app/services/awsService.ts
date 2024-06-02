@@ -1,28 +1,105 @@
-import aws, { S3 } from 'aws-sdk'
+
 import env from '#start/env'
+import AWS from 'aws-sdk';
 
 
-class S3Service {
-  private s3: S3
-  constructor() {
-    this.s3 = new aws.S3()
-  }
+AWS.config.update({
+  accessKeyId: env.get('AWS_ACCESS_KEY_ID'),
+    secretAccessKey: env.get('AWS_SECRET_ACCESS_KEY'),
+    region: env.get('AWS_REGION'),
+});
+// Initialize AWS services with credentials and region from environment variables
+const s3 = new AWS.S3();
 
-  async uploadImageToS3(file: any, fileName: string): Promise<string> {
-    const params: S3.Types.PutObjectRequest = {
-      Bucket: env.get('AWS_S3_BUCKET') || '',
-      Key: fileName,
-      Body: file,
-      ACL: 'public-read'
-    }
+const sns = new AWS.SNS();
 
-    try {
-      const result = await this.s3.upload(params).promise()
-      return result.Location
-    } catch (error) {
-      throw new Error(`Error uploading image to S3: ${error.message}`)
-    }
-  }
+const ses = new AWS.SES();
+
+interface FileUpload {
+    name: string;
+    content: Buffer | Uint8Array | Blob | string;
+    contentType: string;
 }
 
-export default S3Service
+interface Notification {
+    message: string;
+    subject: string;
+}
+
+interface Email {
+    to: string;
+    subject: string;
+    body: string;
+}
+
+/**
+ * Upload a file to S3
+ * @param file - The file to upload
+ * @returns The S3 upload response
+ */
+export const uploadToS3 = async (file: FileUpload) => {
+  const params = {
+    Bucket: env.get('AWS_S3_BUCKET'),
+    Key: file.name,
+    Body: file.content,
+    ContentType: file.contentType,
+    // ACL: 'public-read', // This makes the file publicly accessible
+  };
+
+  try {
+    console.log(params)
+    const data = await s3.upload(params).promise();
+    return data;
+  } catch (error) {
+    throw new Error(`Failed to upload file to S3: ${error.message}`);
+  }
+};
+/**
+ * Send a notification via SNS
+ * @param notification - The notification to send
+ * @returns The SNS publish response
+ */
+export const sendNotification = async (topicArn: string, message: string) => {
+  const params = {
+    TopicArn: topicArn,
+    Message: message,
+  };
+
+  try {
+    const data = await sns.publish(params).promise();
+    return data;
+  } catch (error) {
+    throw new Error(`Failed to send notification: ${error.message}`);
+  }
+};
+
+/**
+ * Send an email via SES
+ * @param email - The email to send
+ * @returns The SES send email response
+ */
+export const sendEmail = async (to: string, subject: string, body: string) => {
+  const params = {
+    Source: process.env.AWS_SES_FROM_EMAIL!,
+    Destination: {
+      ToAddresses: [to],
+    },
+    Message: {
+      Subject: {
+        Data: subject,
+      },
+      Body: {
+        Text: {
+          Data: body,
+        },
+      },
+    },
+  };
+
+  try {
+    const data = await ses.sendEmail(params).promise();
+    return data;
+  } catch (error) {
+    throw new Error(`Failed to send email: ${error.message}`);
+  }
+};

@@ -43,10 +43,11 @@ router
 
   router.group(() => {
     router.get('/', [UsersController, 'get']).use([middleware.auth()]);
-    router.put('update-gender', [UsersController, 'updateGender']).use([middleware.auth()]);;
+    router.put('update-profile', [UsersController, 'updateProfile']).use([middleware.auth()]);;
+    router.put('update-password', [UsersController, 'updatePassword']).use([middleware.auth()]);;
     router.put('bvn', [UsersController, 'updateBvn']).use(middleware.auth());
     router.put('nin',[UsersController, 'updateNin']).use(middleware.auth());
-    router.put('upload-image', [UsersController, 'updatePhoto']).use(middleware.auth());
+    router.post('upload-image', [UsersController, 'uploadPhoto']).use(middleware.auth());
     router.put('2fa', [UsersController, 'update2fa']).use(middleware.auth());
     router.put('kin', [UsersController, 'updateKin']).use(middleware.auth());
   }).prefix('/api/user');

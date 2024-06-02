@@ -1,8 +1,12 @@
-import { updateKinValidator, updatePasswordValidator, updatePhoneNumberValidator, updatePinValidator } from '#validators/user'
+import { photoUploadValidator, updateKinValidator, updatePasswordValidator, updatePhoneNumberValidator, updatePinValidator, updateProfileValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import SmsService from '#services/smsService'
-import AwsService from '#services/awsService'
+import { uploadToS3 } from '#services/awsService'
 import GenerateTokenHelper from '#services/generateToken'
+import hash from '@adonisjs/core/services/hash'
+import app from '@adonisjs/core/services/app'
+import fs from 'fs'
+
 
 export default class UsersController {
 
@@ -17,38 +21,72 @@ export default class UsersController {
         return response.status(200).json({ user })
     }
 
-
     /**
-      * @updateGender
-      * @description User update gender endpoint.
-      * @responseBody 200 - User update successfully
-      * @requestBody {"gender": "Male"}
-      */
-    async updateGender({ auth, response, request }: HttpContext) {
-        // Get the logged in user
-        const user = await auth.user!
-        // Extract data from the request
-        user.gender = request.input('gender')
-        user.save()
-        return response.status(204).send("success")
+ * @updateProfile
+ * @description User update Profile endpoint.
+ * @requestBody {"gender": "MALE", "username": "johndoe","fullName": "John Doe", "dateOfBirth": "1990-01-01"}
+ * @responseBody 200 - {"message": "Profile updated successfully"}
+ * @responseBody 422 - {"errors": ["Validation error message"]}
+ * @responseBody 500 - {"error": "Something went wrong" }
+ */
+    async updateProfile({ auth, response, request }: HttpContext) {
+        try {
+            // Validate the request payload
+            const payload = await request.validateUsing(updateProfileValidator)
+            // Get the logged-in user
+            const user = await auth.authenticate()
+
+            user.username = payload.username,
+                user.dob = payload.dateOfBirth,
+                user.fullName = payload.fullName,
+                user.gender = payload.gender,
+                await user.save()
+
+            return response.status(200).send({ message: 'Profile updated successfully' })
+        } catch (error) {
+            console.log(error)
+            if (error.messages) {
+                // Validation error
+                return response.status(422).send({ errors: error.messages })
+            }
+            return response.status(500).send({ error: 'Something went wrong' })
+        }
     }
 
     /**
-  * @updatePassword
-  * @description User Updated password.
-  * @responseBody 204 - User Password  successfully
-  * @requestBody {"old_password": "Password123$$", "new_password": "Nairaland007$$"}
-  */
+      * @updatePassword
+      * @description User change password endpoint.
+      * @responseBody 200 - {"message": "Password updated successfully"}
+      * @responseBody 400 - {"error": "Incorrect old password"}
+      * @responseBody 422 - {"errors": "Validation error message"}
+      * @responseBody 500 - {"error": "Something went wrong" }
+      * @requestBody {"oldPassword": "oldpassword123","newPassword": "newpassword123","confirmPassword": "newpassword123"}
+     */
     async updatePassword({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(updatePasswordValidator)
         try {
-            let user = await auth.user!
-            if (user.password !== payload.old_password) throw new Error("Invalid old password")
-            user.password = payload.new_password
+            // Get the logged-in user
+            const user = await auth.authenticate()
+
+            // Verify the old password
+            const isSame = await hash.verify(user.password, payload.oldPassword)
+            if (!isSame) {
+                return response.status(400).send({ error: 'Incorrect old password' })
+            }
+
+            // Update to the new password
+            user.password = payload.newPassword
             await user.save()
-            return response.status(204).send({ message: "User password changed successfully" })
-        } catch (e) {
-            return response.forbidden(e.message)
+
+            return response.status(200).send({ message: 'Password changed successfully' })
+        } catch (error) {
+            if (error.messages) {
+                // Validation error
+                return response.status(422).send({ errors: error.messages })
+            }
+
+            // General error
+            return response.status(500).send({ error: 'Something went wrong' })
         }
     }
 
@@ -131,32 +169,75 @@ export default class UsersController {
     }
 
 
-          /** 
-      * @updatePhoto
-      * @description User Updated profile picture
-      * @responseBody 204 - User picture added successfully 
-      * @requestBody {"photo":{"type":"string","format":"binary"}} // Expects a valid OpenAPI 3.x JSON
-      */
-    async updatePhoto({ auth, response, request }: HttpContext) {
+
+    /**
+   * @uploadPhoto
+   * @description Handle photo upload
+   * @requestFormDataBody {"picture":{"type":"string","format":"binary"}} // Expects a valid OpenAPI 3.x JSON
+   * @responseBody 200 - Photo uploaded successfully
+   * @responseBody 400 - Validation error
+   * @responseBody 500 - Error uploading photo
+   */
+    async uploadPhoto({ auth, request, response }: HttpContext) {
+
+        const payload = await request.validateUsing(photoUploadValidator)
+
+        const photo = payload.photo
+        // // Ensure the user is authenticated
+        const user = await auth.authenticate();
+        if (!user) {
+            return response.status(401).json({ message: 'Authentication failed' });
+        }
+
+        if (photo.type != "image") {
+            return response.badRequest({ message: 'Invalid file type. Only images are allowed.' });
+        }
+        // Prepare the file for upload, using a unique filename for security
+        // Placeholder for S3 upload logic
+        
+        const uniqueFileName = `${Date.now()}-${photo.clientName}`;
+        const filePath = app.makePath('uploads', uniqueFileName);
+        await photo.move(app.makePath('uploads'), {
+            name: uniqueFileName,
+            overwrite: true,
+        })
+        const fileType = photo.type
+        const readable = fs.createReadStream(filePath)
         try {
-            let user = await auth.user!
-            let photo = request.file('photo')
-            const upload = new AwsService()
-            const fileName = photo?.clientName ?? `${user.fullName}.jpg`;
-            const path = await upload.uploadImageToS3(photo, fileName)
-            user.picture = path
-            await user.save()
-            return response.status(204).send({ message: "User Picture profile set successfully successfully" })
-        } catch (e) {
-            return response.forbidden(e.message)
+
+          
+            // Upload the photo to S3 (mock)
+            const s3Response = await uploadToS3({ name: uniqueFileName, content: readable, contentType: fileType });
+
+            user.picture = s3Response.Location;
+            // Placeholder for user photo update logic
+            await user.save();
+
+
+            // Return success response
+            return response.status(200).json({
+                message: 'Photo uploaded successfully',
+                url: s3Response.Location,
+            });
+        } catch (error) {
+            // Log the error details for internal diagnostics (use a proper logging library in production)
+            console.error('Error uploading photo:', error);
+
+            // Return a generic error response to the client
+            return response.status(500).json({
+                message: 'Error uploading photo',
+                error: 'An internal error occurred. Please try again later.',
+            });
         }
     }
 
-    async updateBvn({ auth, response, request }: HttpContext) {
 
-    }
 
-    async updateNin({ auth, response, request }: HttpContext) {
+    // async updateBvn({ auth, response, request }: HttpContext) {
 
-    }
+    // }
+
+    // async updateNin({ auth, response, request }: HttpContext) {
+
+    // 
 }

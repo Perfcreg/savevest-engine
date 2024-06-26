@@ -10,10 +10,15 @@
 import router from '@adonisjs/core/services/router'
 import AutoSwagger from "adonis-autoswagger";
 import swagger from "#config/swagger";
+import { apiThrottle } from '#start/limiter'
 import { middleware } from '#start/kernel'
 const UsersController = () => import('#controllers/users_controller');
 const AuthController = () => import('#controllers/auth_controller')
 const PlanController = () => import('#controllers/plans_controller')
+const CardController = () => import('#controllers/user_cards_controller')
+const WalletController = () => import('#controllers/wallets_controller')
+
+
 
 
 router.get('/', ({ request, response }) => {
@@ -35,6 +40,9 @@ router
     router.put('reset-password', [AuthController, 'resetPassword'])
   })
   .prefix('/api/auth')
+  // .use(apiThrottle)
+
+
   
 
 
@@ -45,13 +53,29 @@ router
     router.get('/', [UsersController, 'get']).use([middleware.auth()]);
     router.put('update-profile', [UsersController, 'updateProfile']).use([middleware.auth()]);;
     router.put('update-password', [UsersController, 'updatePassword']).use([middleware.auth()]);;
-    router.put('bvn', [UsersController, 'updateBvn']).use(middleware.auth());
-    router.put('nin',[UsersController, 'updateNin']).use(middleware.auth());
+    router.post('bvn', [UsersController, 'updateKyc']).use(middleware.auth());
+    router.post('pin',[UsersController, 'createPin']).use(middleware.auth());
+    router.post('verify-pin',[UsersController, 'verifyPin']).use(middleware.auth());
+
     router.post('upload-image', [UsersController, 'uploadPhoto']).use(middleware.auth());
     router.put('2fa', [UsersController, 'update2fa']).use(middleware.auth());
     router.put('kin', [UsersController, 'updateKin']).use(middleware.auth());
-  }).prefix('/api/user');
-  
+  }).prefix('/api/user')
+  // .use(apiThrottle)
+
+
+  router
+  .group(() => {
+    router.get('/', [CardController, 'getCards'])
+    router.post('/add-card', [CardController, 'addCard'])
+    router.get('/transactions', [CardController, 'getCardTransactions'])
+
+  })
+  .prefix('/api/user/card')
+  .use(middleware.auth())
+  .use(apiThrottle)
+
+
 
   router
   .group(() => {
@@ -66,6 +90,8 @@ router
 
   })
   .prefix('/api/plan')
+  .use(apiThrottle)
+
 
 
   router
@@ -82,13 +108,15 @@ router
 
   })
   .prefix('/api/group-savings')
+  .use(apiThrottle)
+
 
 
   router
   .group(() => {
-    router.post('register', () => {
-      
-    })
+    router.get('/', [WalletController, 'show'])
+    router.get('transactions', [WalletController, 'fetchWalletTransactions'])
+
     router.post('login', () => {
 
     })
@@ -97,7 +125,11 @@ router
     })
 
   })
-  .prefix('/api/wallet')
+  .prefix('/api/user/wallet')
+  .use(apiThrottle)
+  .use(middleware.auth())
+
+
 
 
 

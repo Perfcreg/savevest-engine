@@ -6,10 +6,10 @@ export default class extends BaseSchema {
   async up() {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
-      table.integer('wallet_id').unsigned().references('users.id').onDelete('CASCADE');
-      table.integer('savings_id').unsigned().references('savings.id').onDelete('CASCADE');
+      table.integer('wallet_id').unsigned().references('wallets.id').onDelete('CASCADE');
+      table.integer('user_id').unsigned().references('users.id').onDelete('CASCADE');
       table.decimal('amount', 15, 2).notNullable();
-      table.enum('transaction_type', ['DEPOSIT', 'WITHDRAWAL']).notNullable();
+      table.enum('transaction_type', ['DEPOSIT','WITHDRAWAL','TRANSFER','TRANSFER_REVERSAL','INTEREST']).notNullable();
       table.string('reference').notNullable();
       table.timestamp('transaction_date').defaultTo(this.now());
       table.timestamp('created_at')

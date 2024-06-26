@@ -20,6 +20,12 @@ export default class UserCard extends BaseModel {
   declare lastFour: string;
 
   @column()
+  declare signature: string;
+
+  @column()
+  declare expire: string;
+
+  @column()
   declare token: string;
 
   @column.dateTime({ autoCreate: true })

@@ -98,6 +98,15 @@ class PaystackService {
         }
     }
 
+    async verifyTransaction(reference: string){
+        try {
+        const response = await this.paystack.transaction.verify(reference)
+        return response.data 
+        } catch (error) {
+            throw new Error(`Error verifying transaction: ${error.message}`)
+        }
+    }
+
     async cardDeposit(customerEmail: any, amount: any, reference: any, plan: any) {
         try {
             const response = await this.paystack.transaction.initialize({
@@ -137,6 +146,19 @@ class PaystackService {
             return response.data
         } catch (error) {
             throw new Error(`Error adding deposit: ${error.message}`)
+        }
+    }
+
+    async chargeCard (email: any,  card: any){
+        try {
+            const response = await this.paystack.charge.tokenize({
+                email,
+                card
+            })
+            return response
+        } catch (error) {
+            throw new Error(`Error adding deposit: ${error.message}`)
+
         }
     }
 
@@ -182,6 +204,26 @@ class PaystackService {
             return response.data
         } catch (error) {
             throw new Error(`Error creating plan: ${error.message}`)
+        }
+    }
+
+    async refund(data: any)
+    {
+        try {
+            const response = await this.paystack.refund.create(data)
+            return response.data
+        } catch (error) {
+            throw new Error(`Error refunding: ${error.message}`)
+        }
+    }
+
+    async fetchTransactions(data: any)
+    {
+        try {
+            const response = await this.paystack.transaction.list(data)
+            return response.data
+        } catch (error) {
+            throw new Error(`Error fetching user card transactions: ${error.message}`)
         }
     }
 }

@@ -76,4 +76,20 @@ export default class UserBanksController {
       return response.status(400).send({ message: error.message });
     }
   }
+
+  // write the controller that handle bank acccount deletion 
+
+  async deleteBank ({response, params}: HttpContext){
+    try {
+      const bankId = params.id
+      const userBank = await UserBank.findOrFail(bankId);
+      userBank.delete()
+      return response.status(200).send({
+        message: 'Bank account deleted',
+      });
+    } catch (error) {
+      return response.status(400).send({ message: error.message });
+      
+    }
+  }
 }

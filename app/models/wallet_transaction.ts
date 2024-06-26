@@ -4,16 +4,17 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations';
 import Plan from '#models/plan';
 import Saving from '#models/saving';
 import User from '#models/user';
+import Wallet from '#models/wallet';
 
-export default class SavingsTransaction extends BaseModel {
+export default class WalletTransaction extends BaseModel {
   @column({ isPrimary: true })
   declare id: number
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>;
 
-  @belongsTo(() => Saving)
-  declare wallet: BelongsTo<typeof Saving>;
+  @belongsTo(() => Wallet)
+  declare wallet: BelongsTo<typeof Wallet>;
 
   @column()
   declare userId: number;
@@ -25,7 +26,7 @@ export default class SavingsTransaction extends BaseModel {
   declare amount: number;
 
   @column()
-  declare transactionType: 'DEPOSIT' | 'WITHDRAWAL';
+  declare transactionType: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'TRANSFER_REVERSAL' | 'INTEREST';
 
   @column()
   declare reference: string;

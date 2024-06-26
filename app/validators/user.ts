@@ -42,6 +42,27 @@ export const updatePhoneNumberValidator = vine.compile(
   })
 )
 
+
+export const createPinValidator = vine.compile(
+  vine.object({
+    pin: vine
+      .string()
+      .maxLength(4),
+    confirm_pin: vine
+      .string()
+      .maxLength(4)
+      .sameAs('pin')
+  })
+)
+
+export const verifyPinValidator = vine.compile(
+  vine.object({
+    pin: vine
+      .string()
+      .maxLength(4),
+  })
+)
+
 export const updatePinValidator = vine.compile(
   vine.object({
     old_pin: vine

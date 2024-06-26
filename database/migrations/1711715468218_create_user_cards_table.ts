@@ -9,7 +9,10 @@ export default class extends BaseSchema {
       table.integer('user_id').unsigned().references('id').inTable('users').onDelete('CASCADE');
       table.string('card_type').notNullable();
       table.string('last_four').notNullable();
-      table.string('token').notNullable().unique();
+      table.string('signature').notNullable();
+      table.string('token').notNullable();
+      table.string('expire').notNullable();
+
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })

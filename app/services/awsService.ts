@@ -43,11 +43,9 @@ export const uploadToS3 = async (file: FileUpload) => {
     Key: file.name,
     Body: file.content,
     ContentType: file.contentType,
-    // ACL: 'public-read', // This makes the file publicly accessible
-  };
+ };
 
   try {
-    console.log(params)
     const data = await s3.upload(params).promise();
     return data;
   } catch (error) {

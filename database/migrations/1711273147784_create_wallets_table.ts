@@ -7,7 +7,7 @@ export default class extends BaseSchema {
     this.schema.createTable(this.tableName, (table) => {
       table.increments('id')
       table.integer('user_id').unsigned().references('users.id').onDelete('CASCADE').unique() // delete profile when user is deleted
-      table.string("user_wallet")
+      table.decimal('amount', 15, 2).notNullable();
       table.timestamp('created_at', { useTz: true })
       table.timestamp('updated_at')
     })

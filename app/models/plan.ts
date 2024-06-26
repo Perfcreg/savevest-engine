@@ -1,10 +1,12 @@
 import { DateTime } from 'luxon';
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm';
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm';
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 
 import User from '#models/user';
+import PlanType from '#models/plan_type';
+import PlanTransaction from '#models/plan_transaction';
 
-export default class Plan extends BaseModel {
+export default class UserPlan extends BaseModel {
   @column({ isPrimary: true })
   declare id: number;
 
@@ -13,11 +15,6 @@ export default class Plan extends BaseModel {
 
   @column()
   declare description: string;
-
-  @column({
-    consume: (value: string) => value as 'SAVING' | 'AJO' | 'PERSONAL' | 'GROUP',
-  })
-  declare planType: 'SAVING' | 'AJO' | 'PERSONAL' | 'GROUP';
 
   @column()
   declare amount: number;
@@ -31,9 +28,6 @@ export default class Plan extends BaseModel {
   @column()
   declare userId: number;
 
-  @belongsTo(() => User)
-  declare user: BelongsTo<typeof User>;
-
   @column.date()
   declare startDate: DateTime;
 
@@ -45,9 +39,17 @@ export default class Plan extends BaseModel {
   })
   declare interval: 'DAILY' | 'WEEKLY' | 'MONTHLY' ;
 
-
   @column()
-  declare interestRate: number;
+  declare interesEarned: number;
+
+  @belongsTo(() => User)
+  declare user: BelongsTo<typeof User>;
+
+  @belongsTo(() => PlanType)
+  declare planType: BelongsTo<typeof PlanType>
+
+  @hasMany(() => PlanTransaction)
+  declare planTransactions: HasMany<typeof PlanTransaction>
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime;

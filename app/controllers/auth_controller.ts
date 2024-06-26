@@ -42,7 +42,6 @@ export default class AuthController {
       newUser.password = payload.password;
       newUser.fullName = payload.full_name
       newUser.referal = payload.referal || '';
-
       if (
         payload.email == 'demo1@savevesting.com'
         || payload.email == 'demo2@savevesting.com'
@@ -55,7 +54,7 @@ export default class AuthController {
         // await smsService.sendTokenVerificationSMS(payload.phone, token)
 
       }
-      newUser.referal_code = `SV${referal_code}`
+      newUser.referal = `SV${referal_code}`
       await newUser.save()
       return response.status(201).send({ message: "User created Successfully" })
     } catch (e) {
@@ -154,7 +153,8 @@ export default class AuthController {
       const paystackService = new PaystackService();
       const createWallet =  await paystackService.createCustomer(user.email, user.fullName.split (' ')[0], user.fullName.split (' ')[1], user.phone)
       const wallet = new Wallet()
-      wallet.user_wallet = createWallet.customer_code
+      wallet.amount = 0.0
+      user.paystack_id = createWallet.customer_code
       await user.related('wallet').save(wallet)
       await user.save()
       return response.status(200).send({ message: "Phone verification suucsses" })

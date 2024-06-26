@@ -3,13 +3,14 @@ import { withAuthFinder } from '@adonisjs/auth'
 import hash from '@adonisjs/core/services/hash'
 import { compose } from '@adonisjs/core/helpers'
 import { DbAccessTokensProvider } from '@adonisjs/auth/access_tokens'
-import type { HasMany, HasManyThrough, HasOne } from '@adonisjs/lucid/types/relations'
-import { column, BaseModel, hasOne, hasMany, hasManyThrough } from '@adonisjs/lucid/orm'
+import type { BelongsTo, HasMany, HasManyThrough, HasOne } from '@adonisjs/lucid/types/relations'
+import { column, BaseModel, hasOne, hasMany, hasManyThrough, belongsTo } from '@adonisjs/lucid/orm'
 import Wallet from '#models/wallet'
 import Plan from '#models/plan'
 import Saving from '#models/saving'
 import SavingsTransaction from '#models/savings_transaction'
 import WalletTransaction from '#models/wallet_transaction'
+import Role from './role.js'
 
 
 // import Plan from '#models/plan'
@@ -25,6 +26,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare id: number
 
   @column()
+  declare role_id: number
+
+  @column()
   declare fullName: string
 
   @column()
@@ -37,6 +41,9 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare username: string
 
   @column()
+  declare paystack_id: string
+
+  @column()
   declare phone: string
 
   @column()
@@ -46,7 +53,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare token: string
 
   @column()
-  declare referal_code: string
+  declare referal_by: string
 
   @column()
   declare referal: string
@@ -58,7 +65,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare pin: string
 
   @column()
-  declare nin: string
+  declare kyc: boolean
 
   @column()
   declare gender: string
@@ -79,12 +86,27 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare inactivePermantely : boolean
 
   @hasOne(() => Wallet, {
-    foreignKey: 'user_id', // defaults to userId
+    foreignKey: 'user_id', 
   })
   wallet!: HasOne<typeof Wallet>
 
+  @belongsTo(() => Role, {
+    foreignKey: 'role_id',
+  })
+  role!: BelongsTo<typeof Role>
+
+  @belongsTo(() => User, {
+    foreignKey: 'referal_by',
+  })
+  referedBy!: BelongsTo<typeof User>
+
+  @hasMany(() => User, {
+    foreignKey: 'referal_by',
+  })
+  refers!: HasMany<typeof User>
+
   @hasMany(() => Plan, {
-    foreignKey: 'user_id', // defaults to userId
+    foreignKey: 'user_id',
   })
   plan!: HasMany<typeof Plan>
 

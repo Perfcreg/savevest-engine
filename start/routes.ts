@@ -17,6 +17,8 @@ const AuthController = () => import('#controllers/auth_controller')
 const PlanController = () => import('#controllers/plans_controller')
 const CardController = () => import('#controllers/user_cards_controller')
 const WalletController = () => import('#controllers/wallets_controller')
+const BankController = () => import('#controllers/user_banks_controller')
+
 
 
 
@@ -72,6 +74,17 @@ router
 
   })
   .prefix('/api/user/card')
+  .use(middleware.auth())
+  .use(apiThrottle)
+
+  router
+  .group(() => {
+    router.get('/', [BankController, 'get'])
+    router.post('/', [BankController, 'addBank'])
+    // router.get('/transactions', [BankController, 'getCardTransactions'])
+
+  })
+  .prefix('/api/user/bank')
   .use(middleware.auth())
   .use(apiThrottle)
 

@@ -4,24 +4,38 @@ import UserBank from '#models/user_bank';
 import User from '#models/user';
 import { bankValidator } from '#validators/user_bank'; // Replace 'path-to-bank-validator' with the actual path
 
-
 export default class UserBanksController {
 
-    /**
-   * @addBank
-   * @description Add a new bank account to Paystack and save to user_banks table.
-   * @responseBody 201 - Bank account added successfully
-   * @requestBody {bank_code: "044", account_number: "1234567890"}
-   * @responseBody 400 - Bad request
-   * @responseBody 403 - Forbidden
-   */
+  // get user banks
+
+
+  async get({ auth, response }: HttpContext) {
+    try {
+      const user = await auth.user!;
+      const bank = UserBank.findMany('user_id', user.id)
+      return response.status(200).send({
+        message: 'Bank account found',
+        data: bank,
+      });
+    } catch (error) {
+      return response.status(400).send({ message: error.message });
+    }
+  }
+  /**
+ * @addBank
+ * @description Add a new bank account to Paystack and save to user_banks table.
+ * @responseBody 201 - Bank account added successfully
+ * @requestBody {bank_code: "044", account_number: "1234567890"}
+ * @responseBody 400 - Bad request
+ * @responseBody 403 - Forbidden
+ */
   async addBank({ auth, request, response }: HttpContext) {
     const user = auth.user!;
     const { bank_code, account_number, bank_name } = await request.validateUsing(bankValidator);
 
     try {
       const userBank = new UserBank();
-      userBank.userId = user.id;
+      userBank.user_id = user.id;
       userBank.bankName = bank_name;
       userBank.accountNumber = account_number;
       userBank.bankCode = bank_code;
@@ -51,13 +65,6 @@ export default class UserBanksController {
     const { bank_code, account_number, bank_name } = await request.validateUsing(bankValidator);
 
     try {
-    //   const paystackService = new PaystackService();
-    //   const accountValidation = await paystackService.verifyAccount(account_number, bank_code);
-
-    //   if (!accountValidation.status) {
-    //     return response.status(400).send({ message: accountValidation.message });
-    //   }
-
       const userBank = await UserBank.findOrFail(bankId);
       if (userBank.userId !== user.id) {
         return response.status(403).send({ message: 'Forbidden' });
@@ -79,7 +86,7 @@ export default class UserBanksController {
 
   // write the controller that handle bank acccount deletion 
 
-  async deleteBank ({response, params}: HttpContext){
+  async deleteBank({ response, params }: HttpContext) {
     try {
       const bankId = params.id
       const userBank = await UserBank.findOrFail(bankId);
@@ -89,7 +96,7 @@ export default class UserBanksController {
       });
     } catch (error) {
       return response.status(400).send({ message: error.message });
-      
+
     }
   }
 }

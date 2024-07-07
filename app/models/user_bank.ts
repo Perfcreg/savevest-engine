@@ -8,7 +8,7 @@ export default class UserBank extends BaseModel {
   declare id: number
 
   @column()
-  declare userId: number;
+  declare user_id: number;
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>;

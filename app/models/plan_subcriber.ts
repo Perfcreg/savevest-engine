@@ -6,7 +6,7 @@ import type { BelongsTo } from '@adonisjs/lucid/types/relations'
 import User from '#models/user';
 import Plan from '#models/plan';
 
-export default class Saving extends BaseModel {
+export default class PlanSubscriber extends BaseModel {
   @column({ isPrimary: true })
   declare id: number;
 
@@ -30,6 +30,9 @@ export default class Saving extends BaseModel {
 
   @column.date()
   declare endDate: DateTime;
+
+  @column()
+  declare locked: boolean;
 
   @column({
     consume: (value: string) => value as 'Active' | 'Completed' | 'Cancelled',

@@ -7,7 +7,7 @@ import type { BelongsTo, HasMany, HasManyThrough, HasOne } from '@adonisjs/lucid
 import { column, BaseModel, hasOne, hasMany, hasManyThrough, belongsTo } from '@adonisjs/lucid/orm'
 import Wallet from '#models/wallet'
 import Plan from '#models/plan'
-import Saving from '#models/saving'
+import Saving from '#models/plan_subcriber'
 import SavingsTransaction from '#models/savings_transaction'
 import WalletTransaction from '#models/wallet_transaction'
 import Role from '#models/role'

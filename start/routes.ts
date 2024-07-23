@@ -81,7 +81,7 @@ router
   .group(() => {
     router.get('/', [BankController, 'get'])
     router.post('/', [BankController, 'addBank'])
-    // router.get('/transactions', [BankController, 'getCardTransactions'])
+    router.delete('/:id', [BankController, 'deleteBank'])
 
   })
   .prefix('/api/user/bank')

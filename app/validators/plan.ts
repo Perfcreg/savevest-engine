@@ -1,14 +1,17 @@
 import vine from '@vinejs/vine'
+import { time } from 'node:console';
 
 
 /**
- * Validates the Auth's registration action
+ * Validates the Plan's Creation action
  */
 export const createValidator = vine.compile(
     vine.object({
       name: vine.string(),
       description: vine.string(),
       amount: vine.number(),
+      category: vine.string(),
+      time: vine.string(),
       plan_type: vine.enum(['SAVING', 'AJO', 'PERSONAL', 'GROUP']),
       target_amount: vine.number(),
       interval: vine.string(),
@@ -17,4 +20,9 @@ export const createValidator = vine.compile(
     })
   )
 
-  export type PlanCreateValidator = typeof createValidator[];
+
+  export const PlanSubscriberValidator = vine.compile(
+    vine.object({
+      plan_code: vine.string(),
+    })
+  )

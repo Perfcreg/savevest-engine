@@ -11,9 +11,9 @@ export default class UserBanksController {
 
   async get({ auth, response }: HttpContext) {
     try {
-      const user = await auth.user!;
-      const bank = UserBank.findMany('user_id', user.id)
-      return response.status(200).send({
+      const user = await auth.authenticate()
+      const bank = await UserBank.query().where('user_id', user.id)
+      return response.status(200).json({
         message: 'Bank account found',
         data: bank,
       });
@@ -30,15 +30,28 @@ export default class UserBanksController {
  * @responseBody 403 - Forbidden
  */
   async addBank({ auth, request, response }: HttpContext) {
-    const user = auth.user!;
+    const user = await auth.authenticate()
     const { bank_code, account_number, bank_name } = await request.validateUsing(bankValidator);
-
+   
     try {
       const userBank = new UserBank();
       userBank.user_id = user.id;
       userBank.bankName = bank_name;
       userBank.accountNumber = account_number;
       userBank.bankCode = bank_code;
+
+      const existingBank = await UserBank.findBy("account_number", account_number);
+      if (existingBank) {
+        return response.status(400).json({
+          message: "Bank already exists",
+        });
+      }
+      const allBanks = await UserBank.findManyBy("user_id", user.id)
+      if (allBanks.length >= 2) {
+        return response.status(400).json({
+          message: "You can only add 2 banks",
+        });
+      }
       await userBank.save();
 
       return response.status(201).send({

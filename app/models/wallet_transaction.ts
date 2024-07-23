@@ -2,7 +2,7 @@ import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations';
 import Plan from '#models/plan';
-import Saving from '#models/saving';
+import Saving from '#models/plan_subcriber';
 import User from '#models/user';
 import Wallet from '#models/wallet';
 

@@ -1,4 +1,4 @@
-import Saving from '#models/saving';
+import Saving from '#models/plan_subcriber';
 import SavingsTransaction from '#models/savings_transaction';
 import type { HttpContext } from '@adonisjs/core/http'
 import PaystackService from '#services/paystackService'
@@ -68,4 +68,10 @@ export default class SavingsController {
       return response.forbidden(error.message);
     }
   }
+
+  /**
+   * @responseBody 200 - Success
+   * @responseBody 403 - Forbidden
+   */
+  async create
 }

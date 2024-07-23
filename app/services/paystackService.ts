@@ -68,6 +68,16 @@ class PaystackService {
         }
     }
 
+    async cancelSubscription (code: string, token: string){
+        try {
+            const { data } = await this.paystack.subscription.disable(planCode);
+            return data;
+        }
+        catch (error) {
+            throw new Error(`Error Cancelling subscription: ${error.message}`);
+        }
+    }
+
     async createDedicatedVirtualAccount(customer: any) {
         try {
             const response = await this.paystack.dedicated_virtual.create({
@@ -200,6 +210,7 @@ class PaystackService {
                 description,
                 amount,
                 interval,
+
             })
             return response.data
         } catch (error) {

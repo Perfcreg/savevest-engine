@@ -38,7 +38,7 @@ export default class AuthController {
       // save the user data
       const newUser = new User();
       newUser.phone = payload.phone;
-      newUser.email = payload.email;
+      newUser.email = payload.email.toLowerCase();
       newUser.password = payload.password;
       newUser.fullName = payload.full_name
       newUser.referal = payload.referal || '';
@@ -52,7 +52,6 @@ export default class AuthController {
         newUser.token = token
         // const smsService = new SmsService();
         // await smsService.sendTokenVerificationSMS(payload.phone, token)
-
       }
       newUser.referal = `SV${referal_code}`
       await newUser.save()
@@ -74,7 +73,7 @@ export default class AuthController {
     const { ...payload } = await request.validateUsing(loginValidator)
     try {
       // Attempt to authenticate the user
-      const user = await User.verifyCredentials(payload.email, payload.password)
+      const user = await User.verifyCredentials(payload.email.toLowerCase(), payload.password)
       const accessToken = await User.accessTokens.create(user)
       // Check if the user is active and not permanently inactive
       if (user.isActive && !user.inactivePermantely) {

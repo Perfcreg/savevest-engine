@@ -6,7 +6,7 @@ import User from '#models/user';
 import PlanType from '#models/plan_type';
 import PlanTransaction from '#models/plan_transaction';
 
-export default class UserPlan extends BaseModel {
+export default class Plan extends BaseModel {
   @column({ isPrimary: true })
   declare id: number;
 
@@ -28,6 +28,12 @@ export default class UserPlan extends BaseModel {
   @column()
   declare userId: number;
 
+  @column()
+  declare category: string;
+
+  @column()
+  declare time: string;
+
   @column.date()
   declare startDate: DateTime;
 
@@ -38,9 +44,6 @@ export default class UserPlan extends BaseModel {
     consume: (value: string) => value as 'DAILY' | 'WEEKLY' | 'MONTHLY',
   })
   declare interval: 'DAILY' | 'WEEKLY' | 'MONTHLY' ;
-
-  @column()
-  declare interesEarned: number;
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>;

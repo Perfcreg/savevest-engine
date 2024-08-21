@@ -19,9 +19,9 @@ interface IDInfo {
   phone_number: string;
 }
 
-// interface JobOptions {
-//   signature: boolean;
-// }
+interface JobOptions {
+  signature: boolean;
+}
 
 export class SmileIDService {
   private api: IDApi;

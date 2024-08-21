@@ -1,7 +1,7 @@
 import Saving from '#models/plan_subcriber';
 import SavingsTransaction from '#models/savings_transaction';
 import type { HttpContext } from '@adonisjs/core/http'
-import PaystackService from '#services/paystackService'
+// import PaystackService from '#services/paystackService'
 import GenerateTokenHelper from '#services//generateToken';
 
 
@@ -24,7 +24,7 @@ export default class SavingsController {
 
       // Initialize deposit using Paystack
       const reference_code = GenerateTokenHelper.generateAlphanumeric(12);
-      const paystackService = new PaystackService();
+      // const paystackService = new PaystackService();
 
     //   const paymentResponse = await paystackService.cardDeposit(user_email, amount, reference_code);
       
@@ -69,9 +69,5 @@ export default class SavingsController {
     }
   }
 
-  /**
-   * @responseBody 200 - Success
-   * @responseBody 403 - Forbidden
-   */
-  async create
+
 }

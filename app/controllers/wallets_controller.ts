@@ -11,7 +11,7 @@ export default class WalletsController {
   /**
    * Display a list of resource
    */
-  async index({ auth, response }: HttpContext) {
+  async index({ response }: HttpContext) {
     const wallet = await Wallet.all()
     return response.status(200).json({ wallet })
   }
@@ -19,10 +19,10 @@ export default class WalletsController {
   /**
    * Display form to create a new record
    */
-  async create({ auth, request, response }: HttpContext) {
+  async create({ auth, response }: HttpContext) {
 
     const user = await auth.user!
-    const wallet = await Wallet.create({
+    await Wallet.create({
       user_id: user.id,
       amount: 0
     })
@@ -88,11 +88,11 @@ export default class WalletsController {
       page: 1,
       perPage: 10,
     })
-    const WalletPaystackTransactions = paystackTransactions.filter(transaction => 
+    const WalletPaystackTransactions = paystackTransactions.filter((transaction: { channel: string; customer: { customer_code: string } }) => 
       transaction.channel === "bank_transfer" && 
       transaction.customer && // Ensure customer object exists
       transaction.customer.customer_code === user.paystack_id
-    ).map(object => {
+    ).map((object: { amount: number; created_at: any; reference: any; status: any; id: any }) => {
       return {
         amount: object.amount / 100,
         transactionDate: object.created_at,
@@ -124,21 +124,21 @@ export default class WalletsController {
   /**
    * Edit individual record
    */
-  async edit({ auth, request, params }: HttpContext) {
+  async edit({ auth, request }: HttpContext) {
     const user = await auth.user!
     const wallet = await Wallet.findBy('user_id', user.id)
     const amount = request.input('amount')
     const paystack = new PaystackService()
     const { data } = await paystack.addDeposit(user.email, amount, GenerateTokenHelper.generateAlphanumeric(12))
+    if (data.status) {
+      await wallet?.merge({
+        amount: wallet.amount + amount
+      }).save()
+    }
   }
 
   /**
    * Handle form submission for the edit action
    */
   // async update({ params, request }: HttpContext) {}
-
-  /**
-   * Delete record
-   */
-  async destroy({ params }: HttpContext) { }
 }

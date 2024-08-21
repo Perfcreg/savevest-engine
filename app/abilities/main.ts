@@ -12,6 +12,7 @@
 |
 */
 
+import User from '#models/user'
 import { Bouncer } from '@adonisjs/bouncer'
 
 /**
@@ -21,3 +22,7 @@ import { Bouncer } from '@adonisjs/bouncer'
 export const editUser = Bouncer.ability(() => {
   return true
 })
+
+export const isAdmin = Bouncer.ability((user: User) => {
+  return user.role?.name === 'admin'
+})  

@@ -19,15 +19,15 @@ interface IDInfo {
   phone_number: string;
 }
 
-interface JobOptions {
-  signature: boolean;
-}
+// interface JobOptions {
+//   signature: boolean;
+// }
 
 export class SmileIDService {
   private api: IDApi;
 
   constructor(
-    private sidServer: number // 0 for sandbox, 1 for production
+    // private sidServer: number // 0 for sandbox, 1 for production
   ) {
     this.api = new IDApi(env.get('SMILE_ID_PARTNER'), env.get('SMILE_ID_KEY'), 1);
   }

@@ -5,7 +5,7 @@ import { uploadToS3 } from '#services/awsService'
 import GenerateTokenHelper from '#services/generateToken'
 import hash from '@adonisjs/core/services/hash'
 import app from '@adonisjs/core/services/app'
-import fs from 'fs'
+import fs, { ReadStream } from 'fs'
 import { SmileIDService } from '#services/smileIdservice'
 
 
@@ -263,10 +263,19 @@ export default class UsersController {
             overwrite: true,
         })
         const fileType = photo.type
+        const streamToBuffer = async (stream: ReadStream): Promise<Buffer> => {
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of stream) {
+                chunks.push(chunk);
+            }
+            return Buffer.concat(chunks);
+        };
+
         const readable = fs.createReadStream(filePath)
+        const fileBuffer = await streamToBuffer(readable);
         try {
             // Upload the photo to S3 (mock)
-            const s3Response = await uploadToS3({ name: uniqueFileName, content: readable, contentType: fileType });
+            const s3Response = await uploadToS3({ name: uniqueFileName, content: fileBuffer, contentType: fileType });
 
             user.picture = s3Response.Location;
             // Placeholder for user photo update logic
@@ -300,7 +309,7 @@ export default class UsersController {
         try {
             const user = await auth.authenticate();
             const bvn = request.input('bvn');
-            const smileIdservice = new SmileIDService(0);
+            const smileIdservice = new SmileIDService();
             const sendVerify = await smileIdservice.submitKYCJob({
                 job_id: bvn,
                 job_type: 5,

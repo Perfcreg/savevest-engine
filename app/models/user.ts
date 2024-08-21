@@ -12,6 +12,7 @@ import SavingsTransaction from '#models/savings_transaction'
 import WalletTransaction from '#models/wallet_transaction'
 import Role from '#models/role'
 import UserBank from '#models/user_bank'
+import PlanSubscriber from '#models/plan_subcriber'
 
 
 // import Plan from '#models/plan'
@@ -115,6 +116,11 @@ export default class User extends compose(BaseModel, AuthFinder) {
     foreignKey: 'user_id',
   })
   bank!: HasMany<typeof UserBank>
+
+  @hasMany(() => PlanSubscriber, {
+    foreignKey: 'user_id',
+  })
+  subscription!: HasMany<typeof PlanSubscriber>
 
   @hasManyThrough([() => SavingsTransaction, () => Saving])
   declare savingsTransaction: HasManyThrough<typeof SavingsTransaction>

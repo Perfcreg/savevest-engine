@@ -11,6 +11,8 @@ export default class extends BaseSchema {
       table.float('current_amount', 10, 2).notNullable().defaultTo(0);
       table.boolean('locked').nullable().defaultTo(false)
       table.string('status').nullable().checkBetween(['Active', 'Completed', 'Cancelled']).defaultTo('Active')
+      table.string('subscription_code').notNullable().unique()
+      table.string('email_token').notNullable().unique()
       table.timestamp('start_date').notNullable()
       table.timestamp('end_date').notNullable()
       table.timestamp('created_at')

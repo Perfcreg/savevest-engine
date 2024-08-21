@@ -1,10 +1,11 @@
 import { DateTime } from 'luxon';
-import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm';
+import { BaseModel, column, belongsTo, hasMany} from '@adonisjs/lucid/orm';
 import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 
 import User from '#models/user';
 import PlanType from '#models/plan_type';
 import PlanTransaction from '#models/plan_transaction';
+import PlanSubscriber from '#models/plan_subcriber';
 
 export default class Plan extends BaseModel {
   @column({ isPrimary: true })
@@ -15,6 +16,9 @@ export default class Plan extends BaseModel {
 
   @column()
   declare description: string;
+
+  @column()
+  declare planTypeId: number;
 
   @column()
   declare amount: number;
@@ -47,6 +51,9 @@ export default class Plan extends BaseModel {
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>;
+
+  @hasMany(() => PlanSubscriber)
+  declare planSubscribers: HasMany<typeof PlanSubscriber>
 
   @belongsTo(() => PlanType)
   declare planType: BelongsTo<typeof PlanType>

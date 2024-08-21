@@ -1,4 +1,5 @@
 
+// @ts-ignore
 import Paystack from 'paystack-api';
 import env from '#start/env'
 import { DateTime } from 'luxon';
@@ -68,9 +69,19 @@ class PaystackService {
         }
     }
 
+    async getSubscription(code: string){
+        try {
+            const {data} = await this.paystack.subscription.get(code)
+            return data
+        } catch (error) {
+            throw new Error(`Error Getting subscription: ${error.message}`);
+            
+        }
+    }
+
     async cancelSubscription (code: string, token: string){
         try {
-            const { data } = await this.paystack.subscription.disable(planCode);
+            const { data } = await this.paystack.subscription.disable(code, token);
             return data;
         }
         catch (error) {

@@ -21,16 +21,16 @@ interface FileUpload {
     contentType: string;
 }
 
-interface Notification {
-    message: string;
-    subject: string;
-}
+// interface Notification {
+//     message: string;
+//     subject: string;
+// }
 
-interface Email {
-    to: string;
-    subject: string;
-    body: string;
-}
+// interface Email {
+//     to: string;
+//     subject: string;
+//     body: string;
+// }
 
 /**
  * Upload a file to S3

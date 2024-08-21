@@ -50,8 +50,8 @@ export default class AuthController {
         newUser.token = '123456'
       } else {
         newUser.token = token
-        // const smsService = new SmsService();
-        // await smsService.sendTokenVerificationSMS(payload.phone, token)
+        const smsService = new SmsService();
+        await smsService.sendTokenVerificationSMS(payload.phone, token)
       }
       newUser.referal = `SV${referal_code}`
       await newUser.save()

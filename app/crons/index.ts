@@ -1,7 +1,8 @@
+// @ts-ignore
 import schedule from 'node-schedule'
 import logger from '@adonisjs/core/services/logger'
-import Wallet from '#models/wallet';
-import WalletTransaction from '#models/wallet_transaction';
+// import Wallet from '#models/wallet';
+// import WalletTransaction from '#models/wallet_transaction';
 import WalletInterestCronHandler from './handlers/walletInterestCronHandler.js';
 
 

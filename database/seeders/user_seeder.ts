@@ -1,6 +1,6 @@
 import User from '#models/user'
 import GenerateTokenHelper from '#services/generateToken'
-import { Hash } from '@adonisjs/core/hash'
+// import { Hash } from '@adonisjs/core/hash'
 import { BaseSeeder } from '@adonisjs/lucid/seeders'
 
 

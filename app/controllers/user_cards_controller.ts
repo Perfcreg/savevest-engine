@@ -27,7 +27,7 @@ export default class UserCardController {
    * @responseBody 403 - Forbidden
    */
   async addCard({ auth, request, response }: HttpContext) {
-    const { card_number, cvv, expiry_month, expiry_year } = await request.validateUsing(createCardValidator);
+    const { card_number, cvv,  expiry_year } = await request.validateUsing(createCardValidator);
     const [expiryMonth, expiryYear] = expiry_year.split('/');
 
     try {
@@ -84,13 +84,13 @@ export default class UserCardController {
         page: 1,
         perPage: 10,
       })
-      const transaction = paystackTransactions.filter(transaction => 
+      const transactions = paystackTransactions.filter((transaction: { channel: string; customer: { customer_code: string; }; }) => 
         transaction.channel === "card" && 
         transaction.customer && // Ensure customer object exists
         transaction.customer.customer_code === user.paystack_id
       );
       
-      return response.status(200).json({ transaction })
+      return response.status(200).json({ transactions })
     } catch (error) {
       return response.status(400).send({ message: error.message });
     }

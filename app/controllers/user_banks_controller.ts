@@ -1,7 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import PaystackService from '#services/paystackService'; // Replace 'path-to-paystack-service' with the actual path
+// import PaystackService from '#services/paystackService'; // Replace 'path-to-paystack-service' with the actual path
 import UserBank from '#models/user_bank';
-import User from '#models/user';
+// import User from '#models/user';
 import { bankValidator } from '#validators/user_bank'; // Replace 'path-to-bank-validator' with the actual path
 
 export default class UserBanksController {
@@ -79,7 +79,7 @@ export default class UserBanksController {
 
     try {
       const userBank = await UserBank.findOrFail(bankId);
-      if (userBank.userId !== user.id) {
+      if (userBank?.user_id !== user.id) {
         return response.status(403).send({ message: 'Forbidden' });
       }
 

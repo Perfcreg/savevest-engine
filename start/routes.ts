@@ -12,6 +12,7 @@ import AutoSwagger from "adonis-autoswagger";
 import swagger from "#config/swagger";
 import { apiThrottle } from '#start/limiter'
 import { middleware } from '#start/kernel'
+// import { isAdmin } from '#abilities/main';
 const UsersController = () => import('#controllers/users_controller');
 const AuthController = () => import('#controllers/auth_controller')
 const PlanController = () => import('#controllers/plans_controller')
@@ -58,7 +59,6 @@ router
     router.post('bvn', [UsersController, 'updateKyc']).use(middleware.auth());
     router.post('pin',[UsersController, 'createPin']).use(middleware.auth());
     router.post('verify-pin',[UsersController, 'verifyPin']).use(middleware.auth());
-
     router.post('upload-image', [UsersController, 'uploadPhoto']).use(middleware.auth());
     router.put('2fa', [UsersController, 'update2fa']).use(middleware.auth());
     router.put('kin', [UsersController, 'updateKin']).use(middleware.auth());
@@ -71,39 +71,50 @@ router
     router.get('/', [CardController, 'getCards'])
     router.post('/add-card', [CardController, 'addCard'])
     router.get('/transactions', [CardController, 'getCardTransactions'])
-
   })
   .prefix('/api/user/card')
   .use(middleware.auth())
-  .use(apiThrottle)
+  // .use(apiThrottle)
 
   router
   .group(() => {
     router.get('/', [BankController, 'get'])
     router.post('/', [BankController, 'addBank'])
     router.delete('/:id', [BankController, 'deleteBank'])
-
   })
   .prefix('/api/user/bank')
   .use(middleware.auth())
-  .use(apiThrottle)
+  // .use(apiThrottle)
+
+
+
+  router
+  .group(() => { 
+    router.post('create', [PlanController, 'create']);
+    router.get('/', [PlanController, 'getUsersPlan']);
+    router.get('/type', [PlanController, 'getPlanType'])
+    router.get('/:plan_id', [PlanController, 'getPlanSubscribers'])
+    // router.post('get_transaction/:plan_code', [PlanController, 'getPlanTransactions'])
+    router.post('subscribe/:plan_code', [PlanController, 'joinPlan'])
+    router.put('unsubscribe/:plan_code', [PlanController, 'cancelSubscription'])
+    router.get('getplan/:plan_code', [PlanController, 'getPlan'])
+  })
+  .prefix('/api/user/plan')
+  // .use(apiThrottle)
+  .use(middleware.auth());
 
 
 
   router
   .group(() => {
-    router.get('/', [PlanController, 'index']).use(middleware.auth());
-    router.post('create', [PlanController, 'create']).use(middleware.auth());
-    router.put('update', () => {
-
-    })
-    router.put('verify', () => {
-
-    })
-
+    router.get('/', [PlanController, 'index']);
+    router.get('/:plan_code', [PlanController, 'getPlan']);
   })
-  .prefix('/api/plan')
+  .prefix('/api/admin/plan')
   .use(apiThrottle)
+  .use(middleware.auth())
+  // .use(isAdmin)
+
 
 
 

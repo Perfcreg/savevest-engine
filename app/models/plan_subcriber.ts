@@ -1,7 +1,7 @@
 
 import { DateTime } from 'luxon';
-import { BaseModel, column, belongsTo } from '@adonisjs/lucid/orm';
-import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import { BaseModel, column, belongsTo, hasMany } from '@adonisjs/lucid/orm';
+import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 
 import User from '#models/user';
 import Plan from '#models/plan';
@@ -22,11 +22,22 @@ export default class PlanSubscriber extends BaseModel {
   @belongsTo(() => Plan)
   declare plan: BelongsTo<typeof Plan>;
 
+  @hasMany(() => PlanSubscriber, {
+    foreignKey: 'planId',
+  })
+  declare otherSubscribers: HasMany<typeof PlanSubscriber>
+
   @column()
   declare currentAmount: number;
 
   @column.date()
   declare startDate: DateTime;
+
+  @column()
+  declare subscriptionCode: string;
+
+  @column()
+  declare emailToken: string;
 
   @column.date()
   declare endDate: DateTime;

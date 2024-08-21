@@ -31,7 +31,7 @@ export class SmileIDService {
   ) {
     this.api = new IDApi(env.get('SMILE_ID_PARTNER'), env.get('SMILE_ID_KEY'), 1);
   }
-
+  
   /**
    * Submits a KYC job to Smile Identity for verification.
    * @param trackingParams Parameters for tracking the job.

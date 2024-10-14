@@ -3,6 +3,7 @@ import SavingsTransaction from '#models/savings_transaction';
 import type { HttpContext } from '@adonisjs/core/http'
 // import PaystackService from '#services/paystackService'
 import GenerateTokenHelper from '#services//generateToken';
+import IncentiveService from '#services/incentiveService';
 
 
 export default class SavingsController {
@@ -42,6 +43,9 @@ export default class SavingsController {
       // Update Saving record
       saving.currentAmount += amount;
       await saving.save();
+
+      // Calculate and apply incentives
+      await IncentiveService.calculateAndApplyIncentives(user.id);
 
       return response.status(201).send({
         message: 'Deposit initiated successfully',

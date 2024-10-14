@@ -36,7 +36,7 @@ export const apiThrottle = limiter.define('api', (ctx) => {
     .allowRequests(10)
     .every('1 minute')
     .usingKey(`ip_${ctx.request.ip()}`)
-    .blockFor('30 mins')
+    .blockFor('1 mins')
     .limitExceeded((error) => {
       error
         .setStatus(400)

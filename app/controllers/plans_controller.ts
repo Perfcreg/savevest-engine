@@ -55,13 +55,16 @@ export default class PlansController {
       plan.description = payload.description;
       plan.amount = payload.amount;
       plan.userId = user.id;
-      plan.category = payload.category;
-      plan.time = payload.time;
+      // plan.category = payload.category;
+      // plan.time = payload.time;
       plan.targetAmount = payload.target_amount;
       plan.interval = payload.interval.toUpperCase() as "DAILY" | "WEEKLY" | "MONTHLY";
       plan.startDate = DateTime.fromISO(payload.start_date.toISOString());
       plan.endDate = DateTime.fromISO(payload.end_date.toISOString());
+      plan.interestEarned = payload.interest
+      plan.interestRate = payload.interest
 
+      plan.planTypeId = payload.plan_id
       const paystackService = new PaystackService();
       const paystackPlan = await paystackService.createPlan(
         payload.name,
@@ -71,19 +74,22 @@ export default class PlansController {
       );
 
       plan.planCode = paystackPlan.plan_code;
-      const data = await plan.save();
 
       // Generate a reference code
       const access_code = await UserCard.findBy('user_id', user.id)
 
       if (access_code === null) {
         return response.forbidden({
-          message: 'No Debit card found',
+          message: 'No Debit card found, Create a Card to continue',
         });
       }
 
+      // create a paystack charge for the card to add it 
+
+      // console.log(create_subscription)
       const create_subscription = await paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
-      console.log(create_subscription)
+
+      const data = await plan.save();
       // Create and save to Savings table
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
@@ -95,6 +101,7 @@ export default class PlansController {
       userSavings.endDate = DateTime.fromISO(payload.end_date.toISOString());
 
       await userSavings.save();
+      
 
       return response.status(201).send({
         message: 'Plan created successfully'

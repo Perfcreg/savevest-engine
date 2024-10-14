@@ -6,11 +6,10 @@ import logger from '@adonisjs/core/services/logger'
 import WalletInterestCronHandler from './handlers/walletInterestCronHandler.js';
 
 
-schedule.scheduleJob('* * * * *', async function () {
-    await new WalletInterestCronHandler().run().catch((error) => logger.error('Walllet Handler: %o', error));
-    logger.info('In-process')
-
-})
+schedule.scheduleJob('0 0 * * *', async function () {
+    await new WalletInterestCronHandler().run().catch((error) => logger.error('Wallet Handler: %o', error));
+    logger.info('Daily wallet interest process completed');
+});
 
 
 

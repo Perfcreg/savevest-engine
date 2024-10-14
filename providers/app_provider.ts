@@ -22,7 +22,7 @@ export default class AppProvider {
    * The process has been started
    */
   async ready() {
-    // import ('../app/crons/index.js')
+    import ('../app/crons/index.js')
   }
 
   /**

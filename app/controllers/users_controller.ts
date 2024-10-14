@@ -7,9 +7,40 @@ import hash from '@adonisjs/core/services/hash'
 import app from '@adonisjs/core/services/app'
 import fs, { ReadStream } from 'fs'
 import { SmileIDService } from '#services/smileIdservice'
+import IncentiveService from '#services/incentiveService'
 
 
 export default class UsersController {
+  async getUserIncentives({ auth, response }: HttpContext) {
+    try {
+      const user = auth.user!
+      const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
+      return response.status(200).json({
+        message: 'User incentives retrieved successfully',
+        data: { totalIncentives }
+      })
+    } catch (error) {
+      return response.status(500).json({
+        message: 'Error retrieving user incentives',
+        error: error.message
+      })
+    }
+  }
+//   async getUserIncentives({ auth, response }: HttpContext) {
+//     try {
+//       const user = auth.user!
+//       const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
+//       return response.status(200).json({
+//         message: 'User incentives retrieved successfully',
+//         data: { totalIncentives }
+//       })
+//     } catch (error) {
+//       return response.status(500).json({
+//         message: 'Error retrieving user incentives',
+//         error: error.message
+//       })
+//     }
+//   }
 
     /**
  * @get
@@ -37,11 +68,12 @@ export default class UsersController {
             // Get the logged-in user
             const user = await auth.authenticate()
 
-            user.username = payload.username,
-                user.dob = payload.dateOfBirth,
-                user.fullName = payload.fullName,
-                user.gender = payload.gender,
-                await user.save()
+            user.username = payload.username
+            user.dob = payload.dateOfBirth
+            user.firstName = payload.firstName
+            user.lastName = payload.lastName
+            user.gender = payload.gender
+            await user.save()
 
             return response.status(200).send({ message: 'Profile updated successfully' })
         } catch (error) {

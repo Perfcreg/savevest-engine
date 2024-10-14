@@ -20,6 +20,8 @@ const CardController = () => import('#controllers/user_cards_controller')
 const WalletController = () => import('#controllers/wallets_controller')
 const BankController = () => import('#controllers/user_banks_controller')
 
+const NotificationController = () => import('#controllers/notificationController')
+
 
 
 
@@ -36,6 +38,7 @@ router.get('/', ({ request, response }) => {
 
 router
   .group(() => {
+    router.post('/webhook/paystack', [WalletController, 'handlePaystackWebhook'])
     router.post('register', [AuthController, 'register'])
     router.post('login', [AuthController, 'login'])
     router.put('verify', [AuthController, 'verifyPhone'])
@@ -45,7 +48,12 @@ router
   .prefix('/api/auth')
   // .use(apiThrottle)
 
+  router
+  .group(() => {
+    router.post('/paystack', [WalletController, 'handlePaystackWebhook'])
 
+  })
+  .prefix('/api')
   
 
 
@@ -62,6 +70,9 @@ router
     router.post('upload-image', [UsersController, 'uploadPhoto']).use(middleware.auth());
     router.put('2fa', [UsersController, 'update2fa']).use(middleware.auth());
     router.put('kin', [UsersController, 'updateKin']).use(middleware.auth());
+    router.put('push-token', [NotificationController, 'updateDeviceId']).use(middleware.auth());
+    router.put('create-dva', [WalletController, 'createDVA']).use(middleware.auth());
+
   }).prefix('/api/user')
   // .use(apiThrottle)
 
@@ -71,6 +82,8 @@ router
     router.get('/', [CardController, 'getCards'])
     router.post('/add-card', [CardController, 'addCard'])
     router.get('/transactions', [CardController, 'getCardTransactions'])
+    router.put('/:id', [CardController, 'updateCard'])
+    router.delete('/:id', [CardController, 'deleteCard'])
   })
   .prefix('/api/user/card')
   .use(middleware.auth())
@@ -150,7 +163,7 @@ router
 
   })
   .prefix('/api/user/wallet')
-  .use(apiThrottle)
+  // .use(apiThrottle)
   .use(middleware.auth())
 
 

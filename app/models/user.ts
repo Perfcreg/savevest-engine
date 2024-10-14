@@ -24,6 +24,9 @@ const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
 })
 
 export default class User extends compose(BaseModel, AuthFinder) {
+  @column()
+  declare deviceId: string | null
+
   @column({ isPrimary: true })
   declare id: number
 
@@ -31,7 +34,10 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare role_id: number
 
   @column()
-  declare fullName: string
+  declare firstName: string
+
+  @column()
+  declare lastName: string
 
   @column()
   declare email: string
@@ -56,6 +62,15 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @column()
   declare referal_by: string
+
+  @column()
+  declare referral_code: string
+
+  @column()
+  declare referral_count: number
+
+  @column()
+  declare referral_incentives: number
 
   @column()
   declare referal: string

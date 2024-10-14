@@ -7,10 +7,11 @@ import { BaseSeeder } from '@adonisjs/lucid/seeders'
 const referal_code = GenerateTokenHelper.generateAlphanumeric(6)
 
 export default class extends BaseSeeder {
-  
+
   async run() {
     // Write your database queries inside the run method
     await User.createMany([
+
       {
         fullName: 'Admin User',
         email: 'admin@example.com',
@@ -18,10 +19,10 @@ export default class extends BaseSeeder {
         phone: '1234567890',
         username: 'admin',
         role_id: 1, // Assuming role_id 1 is for admin
-       referal: `SV${referal_code}`,
-       isActive: true,
-
+        referal: `SV${referal_code}`,
+        isActive: true,
       },
+
       {
         fullName: 'Accountant User',
         email: 'accountant@example.com',
@@ -29,9 +30,10 @@ export default class extends BaseSeeder {
         phone: '1234567891',
         username: 'accountant',
         role_id: 2, // Assuming role_id 2 is for accountant
-       referal: `SV${referal_code}`
-
+        referal: `SV${referal_code}`,
+        isActive: true
       },
+
       {
         fullName: 'Auditor User',
         email: 'auditor@example.com',
@@ -39,9 +41,10 @@ export default class extends BaseSeeder {
         phone: '1234567892',
         username: 'auditor',
         role_id: 3, // Assuming role_id 3 is for auditor
-       referal: `SV${referal_code}`,
-       isActive: true,
+        referal: `SV${referal_code}`,
+        isActive: true,
       },
+
       {
         fullName: 'Analyst User',
         email: 'analyst@example.com',
@@ -49,8 +52,8 @@ export default class extends BaseSeeder {
         phone: '1234567893',
         username: 'analyst',
         role_id: 4, // Assuming role_id 4 is for analyst
-       referal: `SV${referal_code}`,
-       isActive: true,
+        referal: `SV${referal_code}`,
+        isActive: true,
       },
 
       {
@@ -60,10 +63,10 @@ export default class extends BaseSeeder {
         phone: '1234567894',
         username: 'manager',
         role_id: 5, // Assuming role_id 5 is for manager
-       referal: `SV${referal_code}`,
-       isActive: true,
+        referal: `SV${referal_code}`,
+        isActive: true,
       },
-      
+
       {
         fullName: 'Client User',
         email: 'client@example.com',
@@ -72,8 +75,10 @@ export default class extends BaseSeeder {
         username: 'client',
         role_id: 6, // Assuming role_id 6 is for client
         referal: `SV${referal_code}`,
-       isActive: true,
+        isActive: true,
       },
+
+      
     ])
   }
 }

@@ -20,7 +20,7 @@ export default class AuthController {
   * @description User registration endpoint.
   * @responseBody 201 - User Created successfully
   * @responseBody 403  - User Data Exists
-  * @requestBody {"full_name": "Melinda Gates", "email": "usernew1@mail.com", "password": "faf&w22334", "phone": "81345323222", "referal": "BXANGH"}
+  * @requestBody {"firstName": "Melinda", "lastName": "Gates", "email": "usernew1@mail.com", "password": "faf&w22334", "phone": "81345323222", "referal": "BXANGH"}
   */
   async register({ request, response }: HttpContext) {
     //  Validate the request body against the schema defined in validator.ts file
@@ -40,21 +40,34 @@ export default class AuthController {
       newUser.phone = payload.phone;
       newUser.email = payload.email.toLowerCase();
       newUser.password = payload.password;
-      newUser.fullName = payload.full_name
-      newUser.referal = payload.referal || '';
+      newUser.firstName = payload.firstName;
+      newUser.lastName = payload.lastName
+      newUser.referal_by = payload.referal || '';
+      newUser.referral_code = `SV${referal_code}`;
+      newUser.referral_count = 0;
+      newUser.referral_incentives = 0;
+      
+      if (payload.referal) {
+        const referrer = await User.findBy('referral_code', payload.referal);
+        if (referrer) {
+          referrer.referral_count += 1;
+          await referrer.save();
+        }
+      }
+
       if (
         payload.email == 'demo1@savevesting.com'
         || payload.email == 'demo2@savevesting.com'
         || payload.email == 'demo3@savevesting.com'
       ) {
         newUser.token = '123456'
+        await newUser.save()
       } else {
         newUser.token = token
+        await newUser.save()
         const smsService = new SmsService();
-        await smsService.sendTokenVerificationSMS(payload.phone, token)
+        await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
       }
-      newUser.referal = `SV${referal_code}`
-      await newUser.save()
       return response.status(201).send({ message: "User created Successfully" })
     } catch (e) {
       return response.forbidden(e.message)
@@ -120,7 +133,7 @@ export default class AuthController {
     const { phoneNumber } = await request.validateUsing(forgetPasswordValidator)
     const token = GenerateTokenHelper.generateToken(4); // Generate a 10-character token
     try {
-      let user = await User.findBy('phoneNumber', phoneNumber)
+      let user = await User.findBy('phone', phoneNumber)
       if (!user) {
         throw new Error("User with this phone nuber not found")
       }
@@ -150,7 +163,7 @@ export default class AuthController {
       user.token = ''
       user.isActive = true
       const paystackService = new PaystackService();
-      const createWallet =  await paystackService.createCustomer(user.email, user.fullName.split (' ')[0], user.fullName.split (' ')[1], user.phone)
+      const createWallet =  await paystackService.createCustomer(user.email, user.firstName, user.lastName, user.phone)
       const wallet = new Wallet()
       wallet.amount = 0.0
       user.paystack_id = createWallet.customer_code
@@ -161,4 +174,29 @@ export default class AuthController {
       return response.forbidden(e.message)
     }
   }
+
+  /**
+   * @resendToken
+   * @description Resend the token to the user.
+   * @responseBody 200 - Token resent successfully
+   * @responseBody 400 - Unable to send token
+   * @requestBody {}
+   */
+  async resendToken({ request, response }: HttpContext) {
+    try {
+      const user = await User.findByOrFail('phone', request.input('phone'))
+      if (!user.token) {
+        return response.badRequest({ message: 'Unable to send token' })
+      }
+      // Implement your logic to resend the token to the user
+      // For example, you could send an email or SMS with the token
+      const smsService = new SmsService();
+      await smsService.sendTokenVerificationSMS(`+234${request.input('phone')}`, user?.token)
+      return response.ok({ message: 'Token resent successfully' })
+    } catch (error) {
+      return response.badRequest(error.message)
+    }
+  }
+  
+
 }

@@ -19,7 +19,8 @@ export const updateProfileValidator = vine.compile(
   vine.object({
     gender: vine.enum(['male', 'female']),
     username: vine.string().trim().minLength(3).maxLength(30), // Username validation
-    fullName: vine.string().trim().minLength(1).maxLength(50), // Full name validation
+    firstName: vine.string().trim().minLength(1).maxLength(25), // First name validation
+    lastName: vine.string().trim().minLength(1).maxLength(25), // Last name validation
     dateOfBirth: vine.string(), // Date of birth validation
   }),
 )

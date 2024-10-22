@@ -63,6 +63,7 @@
     "adonis-autoswagger": "^2.16.1",
     "aws-sdk": "^2.1580.0",
     "axios": "^1.7.7",
+    "bcrypt": "^5.1.1",
     "crypto": "^1.0.1",
     "expo-server-sdk": "^3.11.0",
     "fs": "^0.0.1-security",

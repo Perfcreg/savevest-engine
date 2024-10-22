@@ -5,6 +5,7 @@ import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 
 import User from '#models/user';
 import Plan from '#models/plan';
+import PlanTransaction from '#models/plans_transaction';
 
 export default class PlanSubscriber extends BaseModel {
   @column({ isPrimary: true })
@@ -26,6 +27,14 @@ export default class PlanSubscriber extends BaseModel {
     foreignKey: 'planId',
   })
   declare otherSubscribers: HasMany<typeof PlanSubscriber>
+
+
+  // plan subscriber has many plantransaction throught plan id
+  @hasMany(() => PlanTransaction, {
+    foreignKey: 'planId',
+    localKey: 'planId',
+  })
+  declare transactions: HasMany<typeof PlanTransaction>
 
   @column()
   declare currentAmount: number;

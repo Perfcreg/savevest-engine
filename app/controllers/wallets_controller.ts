@@ -1,7 +1,6 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import PaystackService from '#services/paystackService'
 import GenerateTokenHelper from '#services/generateToken'
-import env from '#start/env'
 import Wallet from '#models/wallet'
 import WalletTransaction from '#models/wallet_transaction'
 import NotificationService from '#services/notificationService'
@@ -9,6 +8,11 @@ import User from '#models/user'
 import UserBank from '#models/user_bank'
 import Withdrawal from '#models/withdrawal'
 import hash from '@adonisjs/core/services/hash'
+import { DateTime } from 'luxon'
+import PlanTransaction from '#models/plans_transaction'
+import Plan from '#models/plan'
+import PlanSubscriber from '#models/plan_subcriber'
+// const { DateTime } = require('luxon')
 
 
 
@@ -25,23 +29,47 @@ export default class WalletsController {
   async createWithdrawal({ auth, request, response }: HttpContext) {
     try {
       const user = await auth.user!;
-      const { amount, userBankId, password } = request.all();
+      const { amount, bank, password } = request.all();
 
       // Verify password
-      const passwordValid = await hash.verify(password, user.password);
-      if (!passwordValid) {
+      const isPasswordValid = await hash.verify(user.password, password)
+      if (!isPasswordValid) {
         return response.status(401).json({ message: "Invalid password" });
       }
 
+
       // Get user bank details
-      const userBank = await UserBank.findOrFail(userBankId);
+      const userBank = await UserBank.findOrFail(bank);
 
       // Check if user has sufficient balance
       const wallet = await Wallet.findBy('user_id', user.id);
-      if (!wallet || wallet.amount < amount) {
+      if (!wallet || wallet.amount < Number(amount)) {
         return response.status(400).json({ message: "Insufficient balance" });
       }
 
+      // find any withdrawal involving the user that is activily pending, processing
+      const pendingWithdrawal = await Withdrawal.query()
+        .where('user_id', user.id)
+        .whereIn('status', ['pending', 'processing', 'failed'])
+        .first();
+
+      if (pendingWithdrawal) {
+        return response.status(400).json({ message: "You have a pending withdrawal" });
+      }
+
+
+      // check if user have withdraw twice today if then cancel the withdrawal request
+      const today = DateTime.now().startOf('day').toISO()
+      const withdrawalCount = await Withdrawal.query()
+        .where('user_id', user.id)
+        .where('created_at', '>=', today)
+        .count('* as total')
+
+      const totalWithdrawals = Number(withdrawalCount[0].$extras.total)
+
+      if (totalWithdrawals >= 2) {
+        return response.status(400).json({ message: "You have reached the maximum number of withdrawals for today" });
+      }
       // Create Paystack transfer recipient
       const recipientData = await this.paystackService.createRecipient(
         `${user.firstName} ${user.lastName}`,
@@ -49,15 +77,18 @@ export default class WalletsController {
         userBank.bankCode
       );
 
+
+
       const withdrawal = await Withdrawal.create({
         userId: user.id,
         amount,
+        userBankId: bank,
         status: 'pending',
         reference: `WTH_${GenerateTokenHelper.generateAlphanumeric(8)}`,
         recipientCode: recipientData.recipient_code,
       });
       // Create withdrawal record
-     
+
 
       return response.status(200).json({
         message: "Withdrawal request created successfully",
@@ -71,37 +102,57 @@ export default class WalletsController {
     }
   }
 
-    // complete transfer 
-    async completeTransfer({auth,request, response} : HttpContext){
-      const { amount, withdrawalId, pin } = request.all();
-      const user = auth.user!
-      const withdrawal = await Withdrawal.findOrFail(withdrawalId);
-      const wallet = await Wallet.findByOrFail('user_id', user.id);
-      // verify if user pin is the correct pin
-      if (pin !== user.pin) {
-        return response.status(400).json({ message: "Invalid User pin" });
-      }
-      // Initiate transfer
-      const transferData = await this.paystackService.customerWithdrawal(
-        amount,
-        withdrawal.recipientCode,
-        withdrawal.reference
-      );
+  // complete transfer 
+  async completeTransfer({ auth, request, response }: HttpContext) {
+    const { withdrawalId, pin } = request.all();
+    const user = auth.user!
+    const withdrawal = await Withdrawal.findOrFail(withdrawalId);
+    const wallet = await Wallet.findByOrFail('user_id', user.id);
+    // verify if user pin is the correct pin
+    if (pin !== user.pin) {
+      return response.status(400).json({ message: "Invalid User pin" });
+    }
+    // Initiate transfer
+    const transferData = await this.paystackService.customerWithdrawal(
+      withdrawal.amount * 100,
+      withdrawal.recipientCode,
+      withdrawal.reference,
+    );
 
-      // Update withdrawal status and wallet balance
-      await withdrawal.merge({ status: transferData.status }).save();
-      await wallet.merge({ amount: wallet.amount - amount }).save();
+    console.log(transferData)
 
-      // Create wallet transaction record
-      await WalletTransaction.create({
-        walletId: wallet.id,
-        amount: amount,
-        reference: withdrawal.reference,
-        transactionType: 'WITHDRAWAL',
-        userId: user.id
-      });
+    // Update withdrawal status and wallet balance
+    await withdrawal.merge({ 
+                  status: 'processing', 
+                  transferCode: transferData.transfer_code,
+                  transferReference: transferData.id
+                }).save();
+
+
+    // Create wallet transaction record
+    await WalletTransaction.create({
+      walletId: wallet.id,
+      amount: withdrawal.amount,
+      reference: withdrawal.reference,
+      transactionType: 'WITHDRAWAL',
+      userId: user.id
+    });
+
+    await wallet.merge({ amount: wallet.amount - withdrawal.amount }).save();
+
+    await this.notificationService.sendPushNotification(
+      user,
+      '💰 Savevest Wallet Withdrawal',
+      // `Your deposit of ${transactionData.amount / 100} was successfull`,
+      `Your request withdraw of ₦${withdrawal.amount} has been successfull submitted. Your new Savevest wallet balance  will be  ₦${wallet.amount} once this completed. Keep growing! 📈 `,
+      { type: 'wallet' }
+    )
+
+    // send email
+  
+
+  return response.status(200).send({ message: 'Withdrwal Request Successfull' })
   }
-
 
   async handlePaystackWebhook({ request, response }: HttpContext) {
     const signature = request.header('x-paystack-signature')
@@ -129,7 +180,7 @@ export default class WalletsController {
     }
 
     // user add new card and charge was succefull
-    if(event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length === 0 && transactionData.plan.constructor === Object) {
+    if (event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length === 0 && transactionData.plan.constructor === Object) {
       const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
       await this.notificationService.sendPushNotification(
         user,
@@ -140,18 +191,37 @@ export default class WalletsController {
     }
 
 
-     // User was charged for a plan
-     if(event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor === Object) {
+    // User was charged for a plan
+    if (event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor === Object) {
       const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+      
+      const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code || 'PLN_gyhhlvkbevfws94')
+      // add transaction to saving 
+      await PlanTransaction.create({
+        userId: user?.id,
+        amount: transactionData.amount / 100,
+        transactionType: 'DEPOSIT',
+        reference: transactionData.reference,
+        planId: plan.id,
+        transactionDate: transactionData.paid_at,
+        // planId: 
+      })
+
+      // update plan subscriber amount
+      const plan_subcriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
+      plan_subcriber.currentAmount += transactionData.amount / 100
+      plan_subcriber.save()
+
+
       await this.notificationService.sendPushNotification(
         user,
         '💸 Subscription Charge',
-        `You've been charged ${transactionData.amount / 100} for your ${transactionData.plan.name} subscription. Thank you for staying with us! 🙏`,
+        `You've been charged ₦${transactionData.amount / 100} for your ${transactionData.plan.name} subscription. Thank you for staying with us! 🙏`,
         { type: 'subcription' }
       )
     }
 
-    if(event === "subscription.disable") {
+    if (event === "subscription.disable") {
       const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
       await this.notificationService.sendPushNotification(
         user,

@@ -3,7 +3,6 @@ import { HttpContext } from '@adonisjs/core/http';
 import PaystackService from '#services/paystackService'; // Replace 'path-to-paystack-service' with the actual path
 import UserCard from '#models/user_card'
 import { createCardValidator, updateCardValidator } from '#validators/user_card'; // Replace 'path-to-card-validator' with the actual path
-import GenerateTokenHelper from '#services/generateToken';
 
 export default class UserCardController {
 
@@ -19,6 +18,7 @@ export default class UserCardController {
     const userCards = await UserCard.query().where('user_id', user.id)
     return response.status(200).json({ userCards })
   }
+
   /**
    * @addCard
    * @description Add a new card to Paystack and save to user_cards table.
@@ -187,7 +187,7 @@ export default class UserCardController {
         await oldCard.save();
 
         // Find and update associated plans
-        await this.updateAssociatedPlans(user.id, user.email, oldCard.token, tokenResponse.authorization_code);
+        await this.updateAssociatedPlans(user.id, user.email, tokenResponse.authorization_code, );
 
         // Refund the verification charge
         await paystackService.refundTransaction(chargeResponse.data.id, 5000);
@@ -210,7 +210,7 @@ export default class UserCardController {
     }
   }
 
-  private async updateAssociatedPlans(userId: number, userEmail: string, oldAuthorizationCode: string, newAuthorizationCode: string) {
+  private async updateAssociatedPlans(userId: number, userEmail: string, newAuthorizationCode: string) {
     const paystackService = new PaystackService();
     const subscriptions = await paystackService.listSubscriptions(userEmail);
     console.log(newAuthorizationCode)

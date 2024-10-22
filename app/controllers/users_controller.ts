@@ -347,8 +347,8 @@ export default class UsersController {
                 job_type: 5,
                 user_id: user.referal,
             }, {
-                first_name: user.fullName.split(' ')[0],
-                last_name: user.fullName.split(' ')[1],
+                first_name: user.firstName,
+                last_name: user.lastName,
                 country: 'Nigeria',
                 id_type: 'BVN',
                 id_number: bvn,
@@ -356,6 +356,7 @@ export default class UsersController {
                 phone_number: user.phone,
 
             })
+            console.log(sendVerify)
             if (sendVerify.ResultCode == 1020 || sendVerify.ResultCode == 1021) {
                 await user.merge({
                     kyc: true

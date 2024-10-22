@@ -4,7 +4,6 @@ import Paystack from 'paystack-api';
 import env from '#start/env'
 import { DateTime } from 'luxon';
 import crypto from 'crypto';
-import axios from 'axios';
 
 class PaystackService {
     private paystack: typeof Paystack;

@@ -1,6 +1,6 @@
 import User from '#models/user'
 import PlanSubscriber from '#models/plan_subcriber'
-import SavingsTransaction from '#models/savings_transaction'
+import SavingsTransaction from '#models/plans_transaction'
 
 export default class IncentiveService {
   static INCENTIVE_VALUE = 10 // 10 points per incentive

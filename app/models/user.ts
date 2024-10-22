@@ -8,7 +8,7 @@ import { column, BaseModel, hasOne, hasMany, hasManyThrough, belongsTo } from '@
 import Wallet from '#models/wallet'
 import Plan from '#models/plan'
 import Saving from '#models/plan_subcriber'
-import SavingsTransaction from '#models/savings_transaction'
+import SavingsTransaction from '#models/plans_transaction'
 import WalletTransaction from '#models/wallet_transaction'
 import Role from '#models/role'
 import UserBank from '#models/user_bank'

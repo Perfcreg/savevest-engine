@@ -4,12 +4,21 @@ import type { BelongsTo, HasMany } from '@adonisjs/lucid/types/relations'
 
 import User from '#models/user';
 import PlanType from '#models/plan_type';
-import PlanTransaction from '#models/plan_transaction';
+import PlanTransaction from '#models/plans_transaction';
 import PlanSubscriber from '#models/plan_subcriber';
 
 export default class Plan extends BaseModel {
   @column({ isPrimary: true })
   declare id: number;
+
+  @column()
+  declare isLocked: boolean
+
+  @column()
+  declare isBroken: boolean
+
+  @column()
+  declare currentAmount: number
 
   @column()
   declare name: string;

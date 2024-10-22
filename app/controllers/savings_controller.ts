@@ -1,5 +1,5 @@
 import Saving from '#models/plan_subcriber';
-import SavingsTransaction from '#models/savings_transaction';
+import SavingsTransaction from '#models/plans_transaction';
 import type { HttpContext } from '@adonisjs/core/http'
 // import PaystackService from '#services/paystackService'
 import GenerateTokenHelper from '#services//generateToken';
@@ -32,7 +32,7 @@ export default class SavingsController {
       // Create savings transaction
       const savingsTransaction = new SavingsTransaction();
       savingsTransaction.userId = user.id;
-      savingsTransaction.savingsId = saving.id;
+      savingsTransaction.planId = saving.id;
       savingsTransaction.amount = amount;
       savingsTransaction.reference = reference_code;
       await savingsTransaction.save();

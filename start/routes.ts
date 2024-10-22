@@ -48,6 +48,8 @@ router
   .prefix('/api/auth')
   // .use(apiThrottle)
 
+
+
   router
   .group(() => {
     router.post('/paystack', [WalletController, 'handlePaystackWebhook'])
@@ -67,6 +69,9 @@ router
     router.post('bvn', [UsersController, 'updateKyc']).use(middleware.auth());
     router.post('pin',[UsersController, 'createPin']).use(middleware.auth());
     router.post('verify-pin',[UsersController, 'verifyPin']).use(middleware.auth());
+    router.post('withdrawal',[WalletController, 'createWithdrawal']).use(middleware.auth());
+    router.post('complete-withdrawal',[WalletController, 'completeTransfer']).use(middleware.auth());
+
     router.post('upload-image', [UsersController, 'uploadPhoto']).use(middleware.auth());
     router.put('2fa', [UsersController, 'update2fa']).use(middleware.auth());
     router.put('kin', [UsersController, 'updateKin']).use(middleware.auth());
@@ -111,6 +116,10 @@ router
     router.post('subscribe/:plan_code', [PlanController, 'joinPlan'])
     router.put('unsubscribe/:plan_code', [PlanController, 'cancelSubscription'])
     router.get('getplan/:plan_code', [PlanController, 'getPlan'])
+    router.post('/:id/invite', [PlanController, 'inviteMember'])
+    router.put('/:id/lock', [PlanController, 'lockSavings'])
+    router.put('/:id/break', [PlanController, 'breakSavings'])
+    router.get('/:id/transactions', [PlanController, 'getCustomerTransactions'])
   })
   .prefix('/api/user/plan')
   // .use(apiThrottle)
@@ -133,33 +142,8 @@ router
 
   router
   .group(() => {
-    router.post('register', () => {
-      
-    })
-    router.post('login', () => {
-
-    })
-    router.put('verify', () => {
-
-    })
-
-  })
-  .prefix('/api/group-savings')
-  .use(apiThrottle)
-
-
-
-  router
-  .group(() => {
     router.get('/', [WalletController, 'show'])
     router.get('transactions', [WalletController, 'fetchWalletTransactions'])
-
-    router.post('login', () => {
-
-    })
-    router.put('verify', () => {
-
-    })
 
   })
   .prefix('/api/user/wallet')

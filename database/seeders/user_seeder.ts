@@ -13,7 +13,8 @@ export default class extends BaseSeeder {
     await User.createMany([
 
       {
-        fullName: 'Admin User',
+        firstName: 'Admin',
+        lastName: 'User',
         email: 'admin@example.com',
         password: 'password123',
         phone: '1234567890',
@@ -24,7 +25,8 @@ export default class extends BaseSeeder {
       },
 
       {
-        fullName: 'Accountant User',
+        firstName: 'Accountant',
+        lastName: 'User',
         email: 'accountant@example.com',
         password: 'password123',
         phone: '1234567891',
@@ -35,7 +37,8 @@ export default class extends BaseSeeder {
       },
 
       {
-        fullName: 'Auditor User',
+        firstName: 'Auditor',
+        lastName: 'User',
         email: 'auditor@example.com',
         password: 'password123',
         phone: '1234567892',
@@ -46,7 +49,8 @@ export default class extends BaseSeeder {
       },
 
       {
-        fullName: 'Analyst User',
+        firstName: 'Analyst',
+        lastName: 'User',
         email: 'analyst@example.com',
         password: 'password123',
         phone: '1234567893',
@@ -57,7 +61,8 @@ export default class extends BaseSeeder {
       },
 
       {
-        fullName: 'Manager User',
+        firstName: 'Manager',
+        lastName: 'User',
         email: 'manager@example.com',
         password: 'password123',
         phone: '1234567894',
@@ -68,7 +73,8 @@ export default class extends BaseSeeder {
       },
 
       {
-        fullName: 'Client User',
+        firstName: 'Client',
+        lastName: 'User',
         email: 'client@example.com',
         password: 'password123',
         phone: '1234567895',

@@ -8,7 +8,16 @@ import PlanSubscriber from '#models/plan_subcriber';
 import UserCard from '#models/user_card';
 import Wallet from '#models/wallet';
 import PlanType from '#models/plan_type';
+import User from '#models/user';
+import NotificationService from '#services/notificationService';
 export default class PlansController {
+
+  private paystackService: PaystackService
+  private notificationService: NotificationService
+  constructor() {
+    this.paystackService = new PaystackService()
+    this.notificationService = new NotificationService()
+  }
   /**
 * @index
 * @description fetch all users created plans
@@ -27,7 +36,7 @@ export default class PlansController {
    * @description fetch all plan types existing inside our app
    * @responseBody 200 - All Plan types
    */
-  async getPlanType({response}: HttpContext){
+  async getPlanType({ response }: HttpContext) {
     const planTypes = await PlanType.all()
     // console.log(planTypes)
     return response.status(200).json({
@@ -65,8 +74,8 @@ export default class PlansController {
       plan.interestRate = payload.interest
 
       plan.planTypeId = payload.plan_id
-      const paystackService = new PaystackService();
-      const paystackPlan = await paystackService.createPlan(
+
+      const paystackPlan = await this.paystackService.createPlan(
         payload.name,
         payload.description,
         payload.amount * 100, // Paystack amount is in kobo
@@ -87,7 +96,7 @@ export default class PlansController {
       // create a paystack charge for the card to add it 
 
       // console.log(create_subscription)
-      const create_subscription = await paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
+      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
 
       const data = await plan.save();
       // Create and save to Savings table
@@ -101,7 +110,7 @@ export default class PlansController {
       userSavings.endDate = DateTime.fromISO(payload.end_date.toISOString());
 
       await userSavings.save();
-      
+
 
       return response.status(201).send({
         message: 'Plan created successfully'
@@ -122,11 +131,10 @@ export default class PlansController {
     try {
       const user = await auth.user!
       const plans = await PlanSubscriber.query()
-      .where('user_id', user.id)
-      .preload('plan')
-      .preload('otherSubscribers', (query) => {
-        query.whereNot('user_id', user.id).preload('user')
-      })
+        .where('user_id', user.id)
+        .preload('plan')
+        .preload('otherSubscribers')
+        .preload('transactions')
       return response.status(200).json({ plans })
     }
     catch (err) {
@@ -143,11 +151,11 @@ export default class PlansController {
    * @requestParams { "plan_code": "123232332" }
    */
   async getPlan({ params, response }: HttpContext) {
-    // const paystackService = new PaystackService();
+    // 
     try {
       const plan = await Plan.findByOrFail('plan_code', params.plan_code)
-      
-      // const plan_subscribers =  await paystackService.getPlan(params.plan_code)
+      console.log(plan)
+      // const plan_subscribers =  await this.paystackService.getPlan(params.plan_code)
       return response.status(200).json({
         plan
       });
@@ -170,7 +178,7 @@ export default class PlansController {
    */
   async joinPlan({ auth, response, params }: HttpContext) {
     const user = auth.user!;
-    const paystackService = new PaystackService();
+
     try {
       const plan = await Plan.findBy('plan_code', params.plan_code);
       if (!plan) {
@@ -186,13 +194,13 @@ export default class PlansController {
         });
       }
 
-     const planExist = await PlanSubscriber.query().where('plan_id', plan.id).where('user_id', user.id).first()
-      if(planExist){
+      const planExist = await PlanSubscriber.query().where('plan_id', plan.id).where('user_id', user.id).first()
+      if (planExist) {
         return response.forbidden({
           message: 'This subscription is already in place',
         });
       }
-      const create_subscription =  await paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
+      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
       // Create and save to Savings table
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
@@ -218,9 +226,9 @@ export default class PlansController {
    */
   async getUserPlanTransactions({ response, params }: HttpContext) {
     // const plan = await PlanSubscriber.findByOrFail('subscription_code', params.plan_code);
-    const paystackService = new PaystackService();
+
     try {
-      const request = await paystackService.getSubscription(params.plan_code)
+      const request = await this.paystackService.getSubscription(params.plan_code)
       // console.log(response)
       return response.status(200).json({ message: 'Plan Transaction Fetched Successfully', data: request });
 
@@ -229,16 +237,16 @@ export default class PlansController {
     }
   }
 
-/**
-   * @cancelPlan
-   * @description - User subscribe to another user's plan 
-   * @requestParams { "plan_code": "pln_112122323" }
-   * @responseBody 200 - Plan unsubscribed Successfully
-   * @responseBody 500 - User not found
-   */
+  /**
+     * @cancelPlan
+     * @description - User subscribe to another user's plan 
+     * @requestParams { "plan_code": "pln_112122323" }
+     * @responseBody 200 - Plan unsubscribed Successfully
+     * @responseBody 500 - User not found
+     */
   async cancelSubscription({ auth, response, params }: HttpContext) {
     const user = await auth.user!
-    const paystackService = new PaystackService();
+
     try {
       const plan = await Plan.findByOrFail('plan_code', params.plan_code)
       const subscription = await PlanSubscriber.query().where('plan_id', plan.id).andWhere('user_id', user.id).first()
@@ -250,8 +258,8 @@ export default class PlansController {
         await userWallet.save()
       }
       await subscription?.save()
-      const response = await paystackService.cancelSubscription(subscription?.subscriptionCode || '', subscription?.emailToken || '') 
-      return response.status(200).json({ message: 'Plan unsubscribed successfull'});
+      const response = await this.paystackService.cancelSubscription(subscription?.subscriptionCode || '', subscription?.emailToken || '')
+      return response.status(200).json({ message: 'Plan unsubscribed successfull' });
 
     } catch (error) {
       return response.status(500).json({ error: error.message })
@@ -267,15 +275,155 @@ export default class PlansController {
    */
   async getPlanSubscribers({ response, params }: HttpContext) {
     try {
-      const plansubscriber = await Plan.query().where('id', params.plan_id).preload('planSubscribers', (planSubscriberQuery) => {
+      const plansubscriber = await Plan.query()
+      .where('id', params.plan_id)
+      .preload('planSubscribers', (planSubscriberQuery) => {
         planSubscriberQuery.preload('user')
       }).preload('planType')
-      .first()
-      console.log(plansubscriber)
+      .preload('planTransactions', (planTransactionQuery) => {
+        planTransactionQuery.preload('user')
+      })
+        .first()
       return response.status(200).json({ message: 'Plan Transaction Fetched Successfully', data: plansubscriber });
 
     } catch (error) {
       return response.status(500).json({ error: error.message })
+    }
+  }
+
+
+  /**
+ * @inviteMember
+ * @description Invite a member to join a savings plan.
+ * @responseBody 200 - Invitation sent successfully
+ * @requestBody { username: "example_user" }
+ * @requestParams { "id": "1" }
+ * @responseBody 403 - Forbidden
+ */
+  async inviteMember({ auth, request, params, response }: HttpContext) {
+    const user = auth.user!;
+    const { username } = request.only(['username']);
+
+    try {
+      const plan = await Plan.findOrFail(params.id);
+      const invitedUser = await User.findByOrFail('username', username);
+
+      // Add logic to send invitation (e.g., notification, email)
+      await this.notificationService.sendPushNotification(
+        invitedUser,
+        '🎉 Plan Invite',
+        // Plan invite notification message
+        `${user.username} has invited you to join the ${plan.name} savings plan.`,
+        { type: 'plan_invite' }
+      )
+      // send email
+      // await this.emailService.sendEmail();
+
+      return response.status(200).send({
+        message: 'Member invited successfully',
+      });
+    } catch (error) {
+      return response.forbidden(error.message);
+    }
+  }
+
+  /**
+   * @lockSavings
+   * @description Lock a savings plan.
+   * @responseBody 200 - Savings locked successfully
+   * @requestParams { "id": "1" }
+   * @responseBody 403 - Forbidden
+   */
+  async lockSavings({ auth, params, response }: HttpContext) {
+    const user = auth.user!;
+
+    try {
+      const plan = await PlanSubscriber.findOrFail(params.id);
+
+      if (plan.userId !== user.id) {
+        return response.forbidden('You are not authorized to lock this savings plan');
+      }
+
+      plan.locked = true;
+      await plan.save();
+
+      return response.status(200).send({
+        message: 'Plan Savings locked successfully',
+      });
+    } catch (error) {
+      return response.forbidden(error.message);
+    }
+  }
+
+  /**
+   * @breakSavings
+   * @description Break a savings plan before the withdrawal date.
+   * @responseBody 200 - Savings broken successfully
+   * @requestParams { "id": "1" }
+   * @responseBody 403 - Forbidden
+   */
+  async breakSavings({ auth, params, response }: HttpContext) {
+    const user = auth.user!;
+
+    try {
+      const plan = await PlanSubscriber.findOrFail(params.id);
+
+      if (plan.userId !== user.id) {
+        return response.forbidden('You are not authorized to break this savings plan');
+      }
+
+      if (plan.locked) {
+        return response.forbidden('This savings plan is locked and cannot be broken');
+      }
+      await this.paystackService.cancelSubscription(plan.subscriptionCode, plan.emailToken)
+
+
+      // Calculate penalty (2.5% of savings)
+      const penalty = plan.currentAmount * 0.025;
+      const amountToReturn = plan.currentAmount - penalty;
+
+      // Update user's wallet (assume there's a wallet model)
+      const wallet : any = await user.related('wallet').query().first();
+      wallet.amount = amountToReturn;
+      await wallet.save();
+
+      // Mark savings as broken
+      plan.status = 'Cancelled';
+      plan.currentAmount = 0;
+      await plan.save();
+
+
+      return response.status(200).send({
+        message: 'Savings broken successfully, All savings has been added to wallet.',
+        data: {
+          amountReturned: amountToReturn,
+          penalty: penalty,
+        },
+      });
+    } catch (error) {
+      return response.forbidden(error.message);
+    }
+  }
+
+  /**
+   * @getCustomerTransactions
+   * @description Get all transactions for a specific savings plan.
+   * @responseBody 200 - Success
+   * @requestParams { "id": "1" }
+   * @responseBody 403 - Forbidden
+   */
+  async getCustomerTransactions({ auth, params, response }: HttpContext) {
+    const user = auth.user!;
+
+    try {
+      const plan = await PlanSubscriber.findOrFail(params.id);
+
+      if (plan.userId !== user.id) {
+        return response.forbidden('You are not authorized to view these transactions');
+      };
+      return response.status(200).send(plan.transactions);
+    } catch (error) {
+      return response.forbidden(error.message);
     }
   }
 

@@ -11,6 +11,7 @@ import NotificationService from '#services/notificationService';
 import WalletTransaction from '#models/wallet_transaction';
 import hash from '@adonisjs/core/services/hash';
 import GenerateTokenHelper from '#services/generateToken';
+import UserCard from '#models/user_card';
 export default class PlansController {
 
   private paystackService: PaystackService
@@ -81,27 +82,27 @@ export default class PlansController {
       );
       plan.planCode = paystackPlan.plan_code;
 
-      const create_subscription = await this.paystackService.addDeposit(
-        user.email,
-        payload.amount * 100,
-        referenceCode,
-        plan.planCode
-      );
-      console.log(create_subscription)
+      // Generate a reference code
+      const access_code = await UserCard.findBy('user_id', user.id)
 
+      if (access_code === null) {
+        return response.forbidden({
+          message: 'No Debit card found, Create a Card to continue',
+        });
+      }
+      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
       const data = await plan.save();
       // Create and save to Savings table
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
       userSavings.planId = data.id;
       userSavings.status = 'Active';
-      userSavings.subscriptionCode = create_subscription.access_code;
-      userSavings.emailToken = create_subscription.access_code
+      userSavings.subscriptionCode = create_subscription.subscription_code;
+      userSavings.emailToken = create_subscription.email_token
       userSavings.startDate = DateTime.fromISO(payload.start_date.toISOString());
       userSavings.endDate = DateTime.fromISO(payload.end_date.toISOString());
 
       await userSavings.save();
-
 
       return response.status(201).send({
         message: 'Plan created successfully'
@@ -169,13 +170,19 @@ export default class PlansController {
    */
   async joinPlan({ auth, response, params }: HttpContext) {
     const user = auth.user!;
-    const referenceCode = GenerateTokenHelper.generateAlphanumeric(12);
 
     try {
       const plan = await Plan.findBy('plan_code', params.plan_code);
       if (!plan) {
         return response.status(404).send({
           message: 'Plan not found',
+        });
+      }
+      const access_code = await UserCard.findBy('user_id', user.id)
+
+      if (access_code === null) {
+        return response.forbidden({
+          message: 'No Debit card found',
         });
       }
 
@@ -185,20 +192,14 @@ export default class PlansController {
           message: 'This subscription is already in place',
         });
       }
-      const create_subscription = await this.paystackService.addDeposit(
-        user.email,
-        plan.amount * 100,
-        referenceCode,
-        plan.planCode
-      );
+      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
       // Create and save to Savings table
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
       userSavings.planId = plan.id;
       userSavings.status = 'Active';
-      userSavings.status = 'Active';
-      userSavings.subscriptionCode = create_subscription.access_code;
-      userSavings.emailToken = create_subscription.access_code
+      userSavings.subscriptionCode = create_subscription.subscription_code;
+      userSavings.emailToken = create_subscription.email_token
       userSavings.startDate = DateTime.now()
       userSavings.endDate = plan.endDate;
       await userSavings.save();
@@ -331,7 +332,7 @@ export default class PlansController {
         invitedUser,
         '🎉 Plan Invite',
         // Plan invite notification message
-        `${user.username} has invited you to join the ${plan.name} savings plan.`,
+        `${user.username} has invited you to join the ${plan.name} savings plan. use the code ${plan.planCode} to join` ,
         { type: 'plan_invite' }
       )
       // send email

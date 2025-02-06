@@ -1,0 +1,393 @@
+import { createPinValidator, photoUploadValidator, updateKinValidator, updatePasswordValidator, updatePhoneNumberValidator, updatePinValidator, updateProfileValidator, verifyPinValidator } from '#validators/user'
+import type { HttpContext } from '@adonisjs/core/http'
+import SmsService from '#services/smsService'
+import { uploadToS3 } from '#services/awsService'
+import GenerateTokenHelper from '#services/generateToken'
+import hash from '@adonisjs/core/services/hash'
+import app from '@adonisjs/core/services/app'
+import fs, { ReadStream } from 'fs'
+import { SmileIDService } from '#services/smileIdservice'
+import IncentiveService from '#services/incentiveService'
+export default class UsersController {
+    async getUserIncentives({ auth, response }: HttpContext) {
+        try {
+            const user = auth.user!
+            const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
+            return response.status(200).json({
+                message: 'User incentives retrieved successfully',
+                data: { totalIncentives }
+            })
+        } catch (error) {
+            return response.status(500).json({
+                message: 'Error retrieving user incentives',
+                error: error.message
+            })
+        }
+    }
+
+
+    /**
+     * @get
+     * @description Get logged in user.
+     * @responseBody 200 - Verification successful
+     * @responseBody 401 - User not logged in
+     */
+    async get({ auth, response }: HttpContext) {
+        const user = await auth.user!
+        await user?.load('role')
+        return response.status(200).json({ user })
+    }
+
+    /**
+ * @updateProfile
+ * @description User update Profile endpoint.
+ * @requestBody {"gender": "MALE", "username": "johndoe","fullName": "John Doe", "dateOfBirth": "1990-01-01"}
+ * @responseBody 200 - {"message": "Profile updated successfully"}
+ * @responseBody 422 - {"errors": ["Validation error message"]}
+ * @responseBody 500 - {"error": "Something went wrong" }
+ */
+    async updateProfile({ auth, response, request }: HttpContext) {
+        try {
+            // Validate the request payload
+            const payload = await request.validateUsing(updateProfileValidator)
+            // Get the logged-in user
+            const user = await auth.authenticate()
+
+            user.username = payload.username
+            user.dob = payload.dateOfBirth
+            user.firstName = payload.firstName
+            user.lastName = payload.lastName
+            user.gender = payload.gender
+            await user.save()
+
+            return response.status(200).send({ message: 'Profile updated successfully' })
+        } catch (error) {
+            console.log(error)
+            if (error.messages) {
+                // Validation error
+                return response.status(422).send({ errors: error.messages })
+            }
+            return response.status(500).send({ error: 'Something went wrong' })
+        }
+    }
+
+    /**
+      * @updatePassword
+      * @description User change password endpoint.
+      * @responseBody 200 - {"message": "Password updated successfully"}
+      * @responseBody 400 - {"error": "Incorrect old password"}
+      * @responseBody 422 - {"errors": "Validation error message"}
+      * @responseBody 500 - {"error": "Something went wrong" }
+      * @requestBody {"oldPassword": "oldpassword123","newPassword": "newpassword123","confirmPassword": "newpassword123"}
+     */
+    async updatePassword({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(updatePasswordValidator)
+        try {
+            // Get the logged-in user
+            const user = await auth.authenticate()
+
+            // Verify the old password
+            const isSame = await hash.verify(user.password, payload.oldPassword)
+            if (!isSame) {
+                return response.status(400).send({ error: 'Incorrect old password' })
+            }
+
+            // Update to the new password
+            user.password = payload.newPassword
+            await user.save()
+
+            return response.status(200).send({ message: 'Password changed successfully' })
+        } catch (error) {
+            if (error.messages) {
+                // Validation error
+                return response.status(422).send({ errors: error.messages })
+            }
+
+            // General error
+            return response.status(500).send({ error: 'Something went wrong' })
+        }
+    }
+
+
+    /** 
+      * @updatePhoneNumber
+      * @description User Updated phone number.
+      * @responseBody 204 - User phone successfully
+      * @requestBody {"phone_number": "080341288211"}
+      */
+    async updatePhoneNumber({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(updatePhoneNumberValidator)
+        const token = GenerateTokenHelper.generateToken(4); // Generate a 4-character token
+        try {
+            let user = await auth.user!
+            user.phone = payload.phone_number
+            const smsService = new SmsService();
+            await smsService.sendTokenVerificationSMS(payload.phone_number, token)
+            user.token = token
+            await user.save()
+            return response.status(204).send({ message: "User phone number changed successfully" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+
+    /** 
+ * @createPin
+ * @description User Create pin code.
+ * @responseBody 204 - User pin successfully
+ * @requestBody {"pin": "1234", "confirm_pin": " 1234"}
+ */
+    async createPin({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(createPinValidator)
+        try {
+            let user = await auth.user!
+            if (user.pin != null) {
+                return response.status(400).json({
+                    message: "You have already created a pin"
+                })
+            }
+            function isSimplePin(pin: string) {
+                const simplePins = [
+                    '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
+                    '1234', '2345', '3456', '4567', '5678', '6789', '0123', '1122', '2233', '3344',
+                    '4455', '5566', '6677', '7788', '8899'
+                ];
+
+                return simplePins.includes(pin);
+            }
+
+            if (isSimplePin(payload.pin)) {
+                return response.status(400).json({
+                    message: "Invalid Pin Combination, chooose someting different"
+                })
+            }
+
+            user.pin = payload.pin
+            await user.save()
+            return response.status(200).send({ message: "User pin Added successfully" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+    /** 
+* @VerifyPin
+* @description User Verify pin code.
+* @responseBody 200 - User Verify PIN successfully
+* @requestBody {"pin": "1234"}
+*/
+
+    async verifyPin({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(verifyPinValidator)
+        try {
+            let user = await auth.user!
+            if (user.pin == null) {
+                return response.status(400).json({
+                    message: "You have not created a pin"
+                })
+            }
+
+            if (user.pin !== payload.pin) {
+                return response.status(403).send({ message: "Invalid Pin" })
+            }
+            return response.status(200).send({ message: "User pin verify" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+    /** 
+  * @updatePin
+  * @description User Updated pin number.
+  * @responseBody 200 - User pin successfully
+  * @requestBody {"pin": "1234"}
+  */
+    async updatePin({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(updatePinValidator)
+        try {
+            let user = await auth.user!
+            if (user.pin !== payload.old_pin){
+                return response.status(400).json({
+                    message: "Invalid Pin Combination, chooose someting different"
+                })
+            }
+            if (user.pin == payload.new_pin) {
+                return response.status(400).json({
+                    message: "Use a different Pin"
+                })
+            }
+            function isSimplePin(pin: string) {
+                const simplePins = [
+                    '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
+                    '1234', '2345', '3456', '4567', '5678', '6789', '0123', '1122', '2233', '3344',
+                    '4455', '5566', '6677', '7788', '8899'
+                ];
+
+                return simplePins.includes(pin);
+            }
+
+            if (isSimplePin(payload.new_pin)) {
+                return response.status(400).json({
+                    message: "Invalid Pin Combination, chooose someting different"
+                })
+            }
+            user.pin = payload.new_pin
+            await user.save()
+            return response.status(204).send({ message: "User pin changed successfully" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+    /** 
+  * @updateKin
+  * @description User Updated next of kins
+  * @responseBody 204 - User kins successfully updated
+  * @requestBody {"next_of_kin": "Ajayi Onalaja"}
+  */
+    async updateKin({ auth, response, request }: HttpContext) {
+        const { ...payload } = await request.validateUsing(updateKinValidator)
+        try {
+            let user = await auth.user!
+            user.next_of_kin = payload.kin
+            await user.save()
+            return response.status(200).send({ message: "User next of kin changed successfully" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+
+    /** 
+* @update2fa
+* @description User Updated two factor authentication
+* @responseBody 200 - User 2fa updated successfully 
+* @requestBody {"2fa": true}
+*/
+    async update2fa({ auth, response, request }: HttpContext) {
+        try {
+            let user = await auth.user!
+            user.fa = request.input('2fa')
+            await user.save()
+            return response.status(204).send({ message: "User next of kin changed successfully" })
+        } catch (e) {
+            return response.forbidden(e.message)
+        }
+    }
+
+
+
+    /**
+   * @uploadPhoto
+   * @description Handle photo upload
+   * @requestFormDataBody {"picture":{"type":"string","format":"binary"}} // Expects a valid OpenAPI 3.x JSON
+   * @responseBody 200 - Photo uploaded successfully
+   * @responseBody 400 - Validation error
+   * @responseBody 500 - Error uploading photo
+   */
+    async uploadPhoto({ auth, request, response }: HttpContext) {
+
+        const payload = await request.validateUsing(photoUploadValidator)
+
+        const photo = payload.photo
+        // // Ensure the user is authenticated
+        const user = await auth.authenticate();
+        if (!user) {
+            return response.status(401).json({ message: 'Authentication failed' });
+        }
+
+        if (photo.type != "image") {
+            return response.badRequest({ message: 'Invalid file type. Only images are allowed.' });
+        }
+        // Prepare the file for upload, using a unique filename for security
+        // Placeholder for S3 upload logic
+
+        const uniqueFileName = `${Date.now()}-${photo.clientName}`;
+        const filePath = app.makePath('uploads', uniqueFileName);
+        await photo.move(app.makePath('uploads'), {
+            name: uniqueFileName,
+            overwrite: true,
+        })
+        const fileType = photo.type
+        const streamToBuffer = async (stream: ReadStream): Promise<Buffer> => {
+            const chunks: Uint8Array[] = [];
+            for await (const chunk of stream) {
+                chunks.push(chunk);
+            }
+            return Buffer.concat(chunks);
+        };
+
+        const readable = fs.createReadStream(filePath)
+        const fileBuffer = await streamToBuffer(readable);
+        try {
+            // Upload the photo to S3 (mock)
+            const s3Response = await uploadToS3({ name: uniqueFileName, content: fileBuffer, contentType: fileType });
+
+            user.picture = s3Response.Location;
+            // Placeholder for user photo update logic
+            await user.save();
+
+
+            // Return success response
+            return response.status(200).json({
+                message: 'Photo uploaded successfully',
+                url: s3Response.Location,
+            });
+        } catch (error) {
+            // Log the error details for internal diagnostics (use a proper logging library in production)
+            console.error('Error uploading photo:', error);
+
+            // Return a generic error response to the client
+            return response.status(500).json({
+                message: 'Error uploading photo',
+                error: 'An internal error occurred. Please try again later.',
+            });
+        }
+    }
+
+    /** 
+* @updateKyc
+* @description User Add Kyc
+* @responseBody 200 - User KYC Verification Successful
+* @requestBody {"bvn": "12323237847"}
+*/
+    async updateKyc({ auth, response, request }: HttpContext) {
+        try {
+            const user = await auth.authenticate();
+            const bvn = request.input('bvn');
+            const smileIdservice = new SmileIDService();
+            const sendVerify = await smileIdservice.submitKYCJob({
+                job_id: bvn,
+                job_type: 5,
+                user_id: user.referal,
+            }, {
+                first_name: user.firstName,
+                last_name: user.lastName,
+                country: 'Nigeria',
+                id_type: 'BVN',
+                id_number: bvn,
+                dob: user.dob,
+                phone_number: user.phone,
+
+            })
+            console.log(sendVerify)
+            if (sendVerify.ResultText == 'ID Number Validated' || sendVerify.ResultCode == 1012) {
+                await user.merge({
+                    kyc: true
+                }).save()
+                return response.status(200).send({
+                    message: 'KYC Verification Successful'
+                })
+            } else {
+                return response.status(400).send({
+                    message: 'KYC Verification Failed'
+                })
+            }
+        } catch (error) {
+            return response.status(400).send({
+                message: 'KYC Verification Failed'
+            })
+        }
+    }
+}

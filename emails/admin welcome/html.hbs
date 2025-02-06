@@ -1,0 +1,70 @@
+<html>
+  <head>
+    <style>
+      .header {
+        background-color: navy;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+      
+      .header h1 {
+        font-size: 36px;
+        margin-top: 0;
+      }
+      
+      .content {
+        background-color: #f2f2f2;
+        padding: 40px;
+      }
+      
+      .content h2 {
+        font-size: 24px;
+        margin-bottom: 20px;
+      }
+      
+      .content p {
+        font-size: 16px;
+        line-height: 1.5;
+        margin-bottom: 20px;
+      }
+      
+      .credentials {
+        background-color: navy;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        margin-top: 40px;
+      }
+      
+      .credentials h3 {
+        font-size: 20px;
+        margin-top: 0;
+      }
+      
+      .footer {
+        background-color: navy;
+        color: white;
+        padding: 20px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Welcome to {{ product_name}}</h1>
+    </div>
+    <div class="content">
+      <h2>Dear {{ fullname }},</h2>
+      <p>We are pleased to inform you that you have been registered as a {{role}} on {{ product_name }}. Your role as an {{role}} gives you access to manage and oversee some area or all area of platform, and we are confident that you will find the tools and resources available to you to be helpful in your role.</p>
+      <p>Your login credentials are as follows:</p>
+    </div>
+    <div class="credentials">
+      <h3>Email: {{ username }}</h3>
+      <h3>Password: {{ password }}</h3>
+    </div>
+    <div class="footer">
+      <p>Copyright © 2023 {{ company_name }}. All rights reserved.</p>
+    </div>
+  </body>
+</html>

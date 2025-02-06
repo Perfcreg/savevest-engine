@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f4f4;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      border-radius: 6px;
+      padding: 20px;
+    }
+    h1 {
+      color: #333;
+      font-size: 24px;
+    }
+    p {
+      font-size: 16px;
+      color: #666;
+      line-height: 1.6;
+    }
+    a {
+      color: #3498db;
+      text-decoration: none;
+    }
+    .button {
+      display: inline-block;
+      background-color: #3498db;
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Sorry to See You Go</h1>
+    <p>
+      Hello {{fullname}},
+    </p>
+    <p>
+      We're sorry to see you go and would like to thank you for using our platform. Your records have been successfully deleted from our system.
+    </p>
+    <p>
+      We value your feedback and would greatly appreciate it if you could take a few moments to fill out our survey. This will help us understand your reasons for leaving and allow us to improve our services in the future.
+    </p>
+    <p>
+      <a href="{{survey_link}}" class="button">Take the Survey</a>
+    </p>
+    <p>
+      If you have any questions or concerns, please feel free to contact our support team. We're always here to help.
+    </p>
+    <p>
+      Best regards,<br>
+      The {{company_name}} Team
+    </p>
+  </div>
+</body>
+</html>

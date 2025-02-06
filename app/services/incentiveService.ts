@@ -8,7 +8,7 @@ export default class IncentiveService {
   static async calculateAndApplyIncentives(userId: number) {
     try {
       const user = await User.findOrFail(userId)
-      const referredUsers = await User.query().where('referal_by', user.referral_code)
+      const referredUsers = await User.query().where('referal_by', user.referal)
 
       let totalIncentives = 0
 

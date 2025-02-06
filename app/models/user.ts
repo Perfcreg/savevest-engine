@@ -13,6 +13,7 @@ import WalletTransaction from '#models/wallet_transaction'
 import Role from '#models/role'
 import UserBank from '#models/user_bank'
 import PlanSubscriber from '#models/plan_subcriber'
+import { AccessToken } from '@adonisjs/auth/access_tokens'
 
 
 // import Plan from '#models/plan'
@@ -24,11 +25,19 @@ const AuthFinder = withAuthFinder(() => hash.use('scrypt'), {
 })
 
 export default class User extends compose(BaseModel, AuthFinder) {
+  currentAccessToken?: AccessToken
+  
   @column()
   declare deviceId: string | null
 
   @column({ isPrimary: true })
   declare id: number
+
+  @column()
+  declare pin: string
+
+  @column({ columnName: 'requires_2fa' })
+  declare requires2FA: boolean
 
   @column()
   declare role_id: number
@@ -61,10 +70,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare token: string
 
   @column()
-  declare referal_by: string
-
-  @column()
-  declare referral_code: string
+  declare referal_by: number
 
   @column()
   declare referral_count: number
@@ -77,9 +83,6 @@ export default class User extends compose(BaseModel, AuthFinder) {
 
   @column()
   declare bvn: string
-
-  @column()
-  declare pin: string
 
   @column()
   declare kyc: boolean
@@ -150,7 +153,7 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare updatedAt: DateTime | null
 
   static accessTokens = DbAccessTokensProvider.forModel(User, {
-    expiresIn: '2 days',
+    expiresIn: '7 days',
     prefix: 'svt_',
     table: 'auth_access_tokens',
     type: 'auth_token',

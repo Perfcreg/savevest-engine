@@ -8,48 +8,33 @@ import app from '@adonisjs/core/services/app'
 import fs, { ReadStream } from 'fs'
 import { SmileIDService } from '#services/smileIdservice'
 import IncentiveService from '#services/incentiveService'
-
-
 export default class UsersController {
-  async getUserIncentives({ auth, response }: HttpContext) {
-    try {
-      const user = auth.user!
-      const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
-      return response.status(200).json({
-        message: 'User incentives retrieved successfully',
-        data: { totalIncentives }
-      })
-    } catch (error) {
-      return response.status(500).json({
-        message: 'Error retrieving user incentives',
-        error: error.message
-      })
+    async getUserIncentives({ auth, response }: HttpContext) {
+        try {
+            const user = auth.user!
+            const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
+            return response.status(200).json({
+                message: 'User incentives retrieved successfully',
+                data: { totalIncentives }
+            })
+        } catch (error) {
+            return response.status(500).json({
+                message: 'Error retrieving user incentives',
+                error: error.message
+            })
+        }
     }
-  }
-//   async getUserIncentives({ auth, response }: HttpContext) {
-//     try {
-//       const user = auth.user!
-//       const totalIncentives = await IncentiveService.getUserTotalIncentives(user.id)
-//       return response.status(200).json({
-//         message: 'User incentives retrieved successfully',
-//         data: { totalIncentives }
-//       })
-//     } catch (error) {
-//       return response.status(500).json({
-//         message: 'Error retrieving user incentives',
-//         error: error.message
-//       })
-//     }
-//   }
+
 
     /**
- * @get
- * @description Get logged in user.
- * @responseBody 200 - Verification successful
- * @responseBody 401 - User not logged in
- */
+     * @get
+     * @description Get logged in user.
+     * @responseBody 200 - Verification successful
+     * @responseBody 401 - User not logged in
+     */
     async get({ auth, response }: HttpContext) {
         const user = await auth.user!
+        await user?.load('role')
         return response.status(200).json({ user })
     }
 
@@ -197,6 +182,12 @@ export default class UsersController {
         const { ...payload } = await request.validateUsing(verifyPinValidator)
         try {
             let user = await auth.user!
+            if (user.pin == null) {
+                return response.status(400).json({
+                    message: "You have not created a pin"
+                })
+            }
+
             if (user.pin !== payload.pin) {
                 return response.status(403).send({ message: "Invalid Pin" })
             }
@@ -216,8 +207,32 @@ export default class UsersController {
         const { ...payload } = await request.validateUsing(updatePinValidator)
         try {
             let user = await auth.user!
-            if (user.pin !== payload.old_pin) throw new Error("Invalid old pin")
-            user.password = payload.new_pin
+            if (user.pin !== payload.old_pin){
+                return response.status(400).json({
+                    message: "Invalid Pin Combination, chooose someting different"
+                })
+            }
+            if (user.pin == payload.new_pin) {
+                return response.status(400).json({
+                    message: "Use a different Pin"
+                })
+            }
+            function isSimplePin(pin: string) {
+                const simplePins = [
+                    '0000', '1111', '2222', '3333', '4444', '5555', '6666', '7777', '8888', '9999',
+                    '1234', '2345', '3456', '4567', '5678', '6789', '0123', '1122', '2233', '3344',
+                    '4455', '5566', '6677', '7788', '8899'
+                ];
+
+                return simplePins.includes(pin);
+            }
+
+            if (isSimplePin(payload.new_pin)) {
+                return response.status(400).json({
+                    message: "Invalid Pin Combination, chooose someting different"
+                })
+            }
+            user.pin = payload.new_pin
             await user.save()
             return response.status(204).send({ message: "User pin changed successfully" })
         } catch (e) {
@@ -357,7 +372,7 @@ export default class UsersController {
 
             })
             console.log(sendVerify)
-            if (sendVerify.ResultCode == 1020 || sendVerify.ResultCode == 1021) {
+            if (sendVerify.ResultText == 'ID Number Validated' || sendVerify.ResultCode == 1012) {
                 await user.merge({
                     kyc: true
                 }).save()

@@ -49,6 +49,12 @@ export default class UserCardController {
 
     try {
       const user = auth.user!;
+      // Check if user has a card already only one card is needed
+      const cards = await UserCard.findBy('user_id', user.id)
+      if (cards){
+        throw new Error(`User already have a card attach`);
+      }
+
       const paystackService = new PaystackService();
       const cardData: any = {
         card_number,
@@ -59,7 +65,8 @@ export default class UserCardController {
 
       // Step 1: Tokenize the card
       const tokenizeResponse = await paystackService.tokenizeCard(user.email, data);
-
+      
+      console.log(tokenizeResponse)
       if (!tokenizeResponse.status || !tokenizeResponse.data) {
         throw new Error(`Tokenization failed: ${tokenizeResponse.message || 'Unknown error'}`);
       }
@@ -70,23 +77,28 @@ export default class UserCardController {
         5000, // Charge a small amount like 50 NGN
         tokenizeResponse.data.authorization_code,
       );
-
-      if (!chargeResponse.status || !chargeResponse.data || !chargeResponse.data.authorization) {
+    
+      if (!chargeResponse.status || !chargeResponse.data) {
         throw new Error(`Charge failed: ${chargeResponse.message || 'Unknown error'}`);
       }
 
+   
       // Process the successful charge and save the card
       const userCard = new UserCard();
       userCard.userId = user.id;
-      userCard.cardType = chargeResponse.data.authorization.card_type;
-      userCard.lastFour = chargeResponse.data.authorization.last4;
-      userCard.token = chargeResponse.data.authorization.authorization_code;
-      userCard.signature = chargeResponse.data.authorization.signature;
-      userCard.expire = `${chargeResponse.data.authorization.exp_month}/${chargeResponse.data.authorization.exp_year.substring(2)}`;
+      userCard.cardType = tokenizeResponse.data.card_type;
+      userCard.lastFour = tokenizeResponse.data.last4;
+      userCard.token = tokenizeResponse.data.authorization_code;
+      userCard.signature = tokenizeResponse.data.signature;
+      userCard.expire = `${tokenizeResponse.data.exp_month}/${tokenizeResponse.data.exp_year.substring(2)}`;
       await userCard.save();
-
+      if (chargeResponse.data.status == 'send_pin'){
+        return response.status(201).send({
+          message: chargeResponse.data,
+        });
+      }
       // Refund the charge
-      await paystackService.refundTransaction(chargeResponse.data.id, 5000);
+      await paystackService.refundTransaction(chargeResponse.data.reference, 5000);
 
       return response.status(201).send({
         message: 'Card added successfully',
@@ -269,5 +281,23 @@ export default class UserCardController {
     } catch (error) {
       return response
     }
+  }
+
+  async submitPin({request, response }: HttpContext){
+    const { pin, reference } = request.all()
+    const paystackService = new PaystackService();
+    const chargeResponse = await paystackService.submitPin(pin, reference.reference );
+    // console.log(chargeResponse)
+    if (!chargeResponse.status || !chargeResponse.data) {
+     return response.status(400).send({
+      message: chargeResponse
+     })
+    }
+    await paystackService.refundTransaction(chargeResponse.data.reference, 5000);
+
+    return response.status(200).send({
+      message: 'Card updated successfully and associated plans have been updated',
+      data: chargeResponse.data,
+    }); 
   }
 }

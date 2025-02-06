@@ -4,12 +4,13 @@ import Plan from '#models/plan'
 import { createValidator } from '#validators/plan';
 import { DateTime } from 'luxon';
 import PlanSubscriber from '#models/plan_subcriber';
-// import GenerateTokenHelper from '#services//generateToken';
-import UserCard from '#models/user_card';
 import Wallet from '#models/wallet';
 import PlanType from '#models/plan_type';
 import User from '#models/user';
 import NotificationService from '#services/notificationService';
+import WalletTransaction from '#models/wallet_transaction';
+import hash from '@adonisjs/core/services/hash';
+import GenerateTokenHelper from '#services/generateToken';
 export default class PlansController {
 
   private paystackService: PaystackService
@@ -55,7 +56,7 @@ export default class PlansController {
   async create({ auth, request, response }: HttpContext) {
     const user = auth.user!;
     const { ...payload } = await request.validateUsing(createValidator);
-    // const referenceCode = GenerateTokenHelper.generateAlphanumeric(12);
+    const referenceCode = GenerateTokenHelper.generateAlphanumeric(12);
 
     try {
       // Create a new plan
@@ -70,33 +71,23 @@ export default class PlansController {
       plan.interval = payload.interval.toUpperCase() as "DAILY" | "WEEKLY" | "MONTHLY";
       plan.startDate = DateTime.fromISO(payload.start_date.toISOString());
       plan.endDate = DateTime.fromISO(payload.end_date.toISOString());
-      plan.interestEarned = payload.interest
       plan.interestRate = payload.interest
-
       plan.planTypeId = payload.plan_id
-
       const paystackPlan = await this.paystackService.createPlan(
         payload.name,
         payload.description,
         payload.amount * 100, // Paystack amount is in kobo
         payload.interval.toLowerCase()
       );
-
       plan.planCode = paystackPlan.plan_code;
 
-      // Generate a reference code
-      const access_code = await UserCard.findBy('user_id', user.id)
-
-      if (access_code === null) {
-        return response.forbidden({
-          message: 'No Debit card found, Create a Card to continue',
-        });
-      }
-
-      // create a paystack charge for the card to add it 
-
-      // console.log(create_subscription)
-      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
+      const create_subscription = await this.paystackService.addDeposit(
+        user.email,
+        payload.amount * 100,
+        referenceCode,
+        plan.planCode
+      );
+      console.log(create_subscription)
 
       const data = await plan.save();
       // Create and save to Savings table
@@ -104,8 +95,8 @@ export default class PlansController {
       userSavings.userId = user.id;
       userSavings.planId = data.id;
       userSavings.status = 'Active';
-      userSavings.subscriptionCode = create_subscription.subscription_code;
-      userSavings.emailToken = create_subscription.email_token
+      userSavings.subscriptionCode = create_subscription.access_code;
+      userSavings.emailToken = create_subscription.access_code
       userSavings.startDate = DateTime.fromISO(payload.start_date.toISOString());
       userSavings.endDate = DateTime.fromISO(payload.end_date.toISOString());
 
@@ -178,19 +169,13 @@ export default class PlansController {
    */
   async joinPlan({ auth, response, params }: HttpContext) {
     const user = auth.user!;
+    const referenceCode = GenerateTokenHelper.generateAlphanumeric(12);
 
     try {
       const plan = await Plan.findBy('plan_code', params.plan_code);
       if (!plan) {
         return response.status(404).send({
           message: 'Plan not found',
-        });
-      }
-      const access_code = await UserCard.findBy('user_id', user.id)
-
-      if (access_code === null) {
-        return response.forbidden({
-          message: 'No Debit card found',
         });
       }
 
@@ -200,14 +185,20 @@ export default class PlansController {
           message: 'This subscription is already in place',
         });
       }
-      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
+      const create_subscription = await this.paystackService.addDeposit(
+        user.email,
+        plan.amount * 100,
+        referenceCode,
+        plan.planCode
+      );
       // Create and save to Savings table
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
       userSavings.planId = plan.id;
       userSavings.status = 'Active';
-      userSavings.subscriptionCode = create_subscription.subscription_code;
-      userSavings.emailToken = create_subscription.email_token
+      userSavings.status = 'Active';
+      userSavings.subscriptionCode = create_subscription.access_code;
+      userSavings.emailToken = create_subscription.access_code
       userSavings.startDate = DateTime.now()
       userSavings.endDate = plan.endDate;
       await userSavings.save();
@@ -244,25 +235,52 @@ export default class PlansController {
      * @responseBody 200 - Plan unsubscribed Successfully
      * @responseBody 500 - User not found
      */
-  async cancelSubscription({ auth, response, params }: HttpContext) {
-    const user = await auth.user!
-
+  async cancelSubscription({ auth, params, request, response }: HttpContext) {
     try {
-      const plan = await Plan.findByOrFail('plan_code', params.plan_code)
-      const subscription = await PlanSubscriber.query().where('plan_id', plan.id).andWhere('user_id', user.id).first()
-      subscription?.endDate == DateTime.now()
-      subscription?.status == 'Cancelled'
+      const user = auth.user!;
+      const { password } = request.only(['password']);
+
+      // Verify password
+      const isPasswordValid = await hash.verify(user.password, password)
+      if (!isPasswordValid) {
+        throw new Error('Invalid Credential');
+
+      }
+      const plan = await PlanSubscriber.query().where('plan_id', params.id).andWhere('user_id', user.id).firstOrFail();
+
+      if (plan?.locked) {
+        throw new Error('This savings plan is locked and cannot be broken');
+      }
+
+      // check if plan is less than 30 days
+      const now = DateTime.now();
+      const end = DateTime.fromJSDate(plan?.endDate ?? new Date());
+      const diff = end.diff(now, 'days').days;
+      if (diff < 30) {
+        throw new Error('This savings plan is less than 30 days and cannot be broken');
+      }
+      const response = await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
+
+
+      plan?.endDate == DateTime.now()
+      plan?.status == 'Cancelled'
+      await plan?.save()
       const userWallet = await Wallet.findBy('user_id', user.id)
       if (userWallet) {
-        userWallet.amount += subscription?.currentAmount || 0
+        userWallet.amount += plan?.currentAmount || 0
         await userWallet.save()
       }
-      await subscription?.save()
-      const response = await this.paystackService.cancelSubscription(subscription?.subscriptionCode || '', subscription?.emailToken || '')
+      await WalletTransaction.create({
+        userId: user.id,
+        amount: plan?.currentAmount,
+        transactionType: 'DEPOSIT',
+        reference: plan.plan.planCode,
+        walletId: userWallet?.id,
+      })
       return response.status(200).json({ message: 'Plan unsubscribed successfull' });
 
     } catch (error) {
-      return response.status(500).json({ error: error.message })
+      return response.forbidden(error.message);
     }
   }
 
@@ -276,13 +294,13 @@ export default class PlansController {
   async getPlanSubscribers({ response, params }: HttpContext) {
     try {
       const plansubscriber = await Plan.query()
-      .where('id', params.plan_id)
-      .preload('planSubscribers', (planSubscriberQuery) => {
-        planSubscriberQuery.preload('user')
-      }).preload('planType')
-      .preload('planTransactions', (planTransactionQuery) => {
-        planTransactionQuery.preload('user')
-      })
+        .where('id', params.plan_id)
+        .preload('planSubscribers', (planSubscriberQuery) => {
+          planSubscriberQuery.preload('user')
+        }).preload('planType')
+        .preload('planTransactions', (planTransactionQuery) => {
+          planTransactionQuery.preload('user')
+        })
         .first()
       return response.status(200).json({ message: 'Plan Transaction Fetched Successfully', data: plansubscriber });
 
@@ -331,22 +349,22 @@ export default class PlansController {
    * @lockSavings
    * @description Lock a savings plan.
    * @responseBody 200 - Savings locked successfully
-   * @requestParams { "id": "1" }
+   * @requestParams { "id": "1", "password", "*********" }
    * @responseBody 403 - Forbidden
    */
-  async lockSavings({ auth, params, response }: HttpContext) {
-    const user = auth.user!;
-
+  async lockSavings({ auth, params, request, response }: HttpContext) {
     try {
-      const plan = await PlanSubscriber.findOrFail(params.id);
+      const user = auth.user!;
+      const { password } = request.only(['password']);
 
-      if (plan.userId !== user.id) {
-        return response.forbidden('You are not authorized to lock this savings plan');
+      // Verify password
+      const isPasswordValid = await hash.verify(user.password, password)
+      if (!isPasswordValid) {
+        return response.abort('Invalid credentials')
       }
-
+      const plan = await PlanSubscriber.query().where('plan_id', params.id).andWhere('user_id', user.id).firstOrFail();
       plan.locked = true;
       await plan.save();
-
       return response.status(200).send({
         message: 'Plan Savings locked successfully',
       });
@@ -383,7 +401,7 @@ export default class PlansController {
       const amountToReturn = plan.currentAmount - penalty;
 
       // Update user's wallet (assume there's a wallet model)
-      const wallet : any = await user.related('wallet').query().first();
+      const wallet: any = await user.related('wallet').query().first();
       wallet.amount = amountToReturn;
       await wallet.save();
 

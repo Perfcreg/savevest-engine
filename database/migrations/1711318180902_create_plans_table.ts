@@ -20,7 +20,6 @@ export default class extends BaseSchema {
       }).notNullable()
       table.date('start_date').notNullable();
       table.date('end_date').notNullable();
-      table.float('interest_earned').notNullable()
       table.decimal('interest_rate').nullable()
       table.timestamp('created_at')
       table.timestamp('updated_at')

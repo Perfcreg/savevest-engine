@@ -59,9 +59,9 @@ export const resetPasswordalidator = vine.compile(
       .minLength(8)
       .maxLength(32)
       .confirmed({
-        confirmationField : 'confirmation_password',
+        confirmationField : 'confirm_password',
       }),
-      confirmation_password: vine
+      confirm_password: vine
       .string()
       .minLength(8)
       .maxLength(32)

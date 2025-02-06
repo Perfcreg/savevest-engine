@@ -36,10 +36,12 @@ router.use([() => import('@adonisjs/core/bodyparser_middleware'),
             () => import('@adonisjs/auth/initialize_auth_middleware'), 
             () => import('#middleware/initialize_bouncer_middleware')])
 
+            
 /**
  * Named middleware collection must be explicitly assigned to
  * the routes or the routes group.
  */
 export const middleware = router.named({
-  auth: () => import('#middleware/auth_middleware')
+  auth: () => import('#middleware/auth_middleware'),
+  isAdmin: () => import('#middleware/is_admin_middleware')
 })

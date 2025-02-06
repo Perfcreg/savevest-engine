@@ -12,6 +12,7 @@ import { DateTime } from 'luxon'
 import PlanTransaction from '#models/plans_transaction'
 import Plan from '#models/plan'
 import PlanSubscriber from '#models/plan_subcriber'
+import UserCard from '#models/user_card'
 // const { DateTime } = require('luxon')
 
 
@@ -122,11 +123,11 @@ export default class WalletsController {
     console.log(transferData)
 
     // Update withdrawal status and wallet balance
-    await withdrawal.merge({ 
-                  status: 'processing', 
-                  transferCode: transferData.transfer_code,
-                  transferReference: transferData.id
-                }).save();
+    await withdrawal.merge({
+      status: 'processing',
+      transferCode: transferData.transfer_code,
+      transferReference: transferData.id
+    }).save();
 
 
     // Create wallet transaction record
@@ -149,9 +150,9 @@ export default class WalletsController {
     )
 
     // send email
-  
 
-  return response.status(200).send({ message: 'Withdrwal Request Successfull' })
+
+    return response.status(200).send({ message: 'Withdrwal Request Successfull' })
   }
 
   async handlePaystackWebhook({ request, response }: HttpContext) {
@@ -174,27 +175,84 @@ export default class WalletsController {
       await this.notificationService.sendPushNotification(
         user,
         '🎉 Subscription Successful',
-        `Your subscription to the ${transactionData.plan.name}  plan! Your next billing date is ${transactionData.next_payment_date}. Welcome aboard! 🚀"`,
+        `Your subscription to the ${transactionData.plan.name} plan! Your next billing date is ${transactionData.next_payment_date}. Welcome aboard! 🚀"`,
         { type: 'subscription_created' }
       )
     }
 
     // user add new card and charge was succefull
-    if (event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length === 0 && transactionData.plan.constructor === Object) {
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+    if (event === 'charge.success' && transactionData.channel === 'card' && transactionData.amount == 1000) {
+      const user = await User.findByOrFail('paystack_id', transactionData.customer.customer_code)
+
+      await UserCard.create({
+        cardType : transactionData.auhorization.card_type,
+        expire: `${transactionData.auhorization.exp_month}/ ${transactionData.auhorization.exp_year}`,
+        lastFour: transactionData.auhorization.last4,
+        token: transactionData.auhorization.authorization_code,
+        signature: transactionData.auhorization.signature,
+        userId: user.id
+      })
+      const wallet = await Wallet.findByOrFail('userId', user.id)
+
+      await wallet.merge({
+        amount: wallet.amount + transactionData.amount
+      }).save();
+
+      await WalletTransaction.create({
+        amount: 100,
+        transactionType: 'DEPOSIT',
+        userId: user.id,
+        reference:transactionData.reference,
+        walletId: wallet.id,
+        totalAmount: 100,
+        transactionDate: transactionData.paidAt,
+      })
+
       await this.notificationService.sendPushNotification(
         user,
         '💳 Card Added Successfully',
-        `Your card has been successfully added to your account. You're all set for future transactions! ✅`,
+        `Your card has been successfully charged for  ✅`,
         { type: 'card_added' }
       )
     }
 
+    // user fund a plan via card or any means
+    // user fund a plan via card or any means
+    if (event === 'charge.success' && transactionData.metadata?.plan_id) {
+      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+      const plan = await Plan.findOrFail(transactionData.metadata.plan_id)
+
+      // Record plan transaction
+      await PlanTransaction.create({
+        userId: user?.id,
+        amount: transactionData.amount / 100,
+        transactionType: 'DEPOSIT',
+        reference: transactionData.reference,
+        planId: plan.id,
+        transactionDate: transactionData.paid_at
+      })
+
+      // Update subscriber balance
+      const planSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
+      await planSubscriber.merge({
+        currentAmount: planSubscriber.currentAmount + (transactionData.amount / 100)
+      }).save()
+
+      // Send notification
+      await this.notificationService.sendPushNotification(
+        user,
+        '💰 Plan Payment Successful',
+        `Your payment of ₦${transactionData.amount / 100} for ${plan.name} was successful. Your new plan balance is ₦${planSubscriber.currentAmount}. Keep saving! 🎯`,
+        { type: 'plan_payment' }
+      )
+    }
+
+
 
     // User was charged for a plan
-    if (event === 'charge.success' && transactionData.channel === 'card' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor === Object) {
+    if (event === 'charge.success' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor === Object) {
       const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
-      
+
       const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code || 'PLN_gyhhlvkbevfws94')
       // add transaction to saving 
       await PlanTransaction.create({
@@ -220,6 +278,8 @@ export default class WalletsController {
         { type: 'subcription' }
       )
     }
+
+    // Plan Canceled
 
     if (event === "subscription.disable") {
       const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
@@ -269,6 +329,7 @@ export default class WalletsController {
 
   /**
    * Display form to create a new record
+   * 
    */
   async create({ auth, response }: HttpContext) {
 
@@ -297,7 +358,7 @@ export default class WalletsController {
       }
 
       const paystack = new PaystackService();
-      const { data } = await paystack.addDeposit(user.email, amount, ref);
+      const { data } = await paystack.addDeposit(user.email, amount, ref, ref);
       if (data.status) {
         // Using a database transaction to ensure atomicity
         await wallet.merge({
@@ -380,7 +441,7 @@ export default class WalletsController {
     const wallet = await Wallet.findBy('user_id', user.id)
     const amount = request.input('amount')
     const paystack = new PaystackService()
-    const { data } = await paystack.addDeposit(user.email, amount, GenerateTokenHelper.generateAlphanumeric(12))
+    const { data } = await paystack.addDeposit(user.email, amount, GenerateTokenHelper.generateAlphanumeric(12), 'wallet')
     if (data.status) {
       await wallet?.merge({
         amount: wallet.amount + amount

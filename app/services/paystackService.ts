@@ -90,7 +90,11 @@ class PaystackService {
 
     async cancelSubscription(code: string, token: string) {
         try {
-            const { data } = await this.paystack.subscription.disable(code, token);
+            const params = {
+                code,
+                token
+            };
+            const { data } = await this.paystack.subscription.disable(params);
             return data;
         }
         catch (error) {
@@ -182,7 +186,7 @@ class PaystackService {
 
     async customerWithdrawal(amount: any, recipientCode: any, reference: any) {
         try {
-            const response = await this.paystack. transfer.create({
+            const response = await this.paystack.transfer.create({
                 source: 'balance',
                 amount,
                 recipient: recipientCode,
@@ -195,12 +199,13 @@ class PaystackService {
         }
     }
 
-    async addDeposit(customerEmail: any, amount: any, reference: any) {
+    async addDeposit(customerEmail: any, amount: any, reference: any, plan: any) {
         try {
             const response = await this.paystack.transaction.initialize({
-                email: customerEmail,
-                amount,
                 reference,
+                amount,
+                email: customerEmail,
+                plan,
             })
             return response.data
         } catch (error) {
@@ -254,13 +259,25 @@ class PaystackService {
 
             return response
         } catch (error) {
-            console.error('Paystack API Error (chargeCard):', error.response ? error.response.data : error.message);
+            console.log(error)
+            // console.error('Paystack API Error (chargeCard):', error.response ? error.response.data : error.message);
             throw new Error('Failed to charge card: ' + (error.response ? error.response.data.message : error.message));
         }
     }
 
+    async submitPin(reference: string, pin: string){
+        try {
+            const response = await this.paystack.charge.submitPIN({
+                pin,
+                reference
+            })
+            return response
+        } catch (error) {
+            console.error(error.message);
+            throw new Error(error.message);
+        }
 
-
+    }
 
     async chargeCard (email: string, amount: any, authorization_code: string) {
         try {

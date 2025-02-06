@@ -9,6 +9,7 @@ export default class extends BaseSchema {
       table.integer('user_id').unsigned().references('id').inTable('users')
       table.integer('plan_id').unsigned().references('id').inTable('plans')
       table.float('current_amount', 10, 2).notNullable().defaultTo(0);
+      table.float('interest_earned', 10, 2).notNullable().defaultTo(0);
       table.boolean('locked').nullable().defaultTo(false)
       table.string('status').nullable().checkBetween(['Active', 'Completed', 'Cancelled']).defaultTo('Active')
       table.string('subscription_code').notNullable().unique()

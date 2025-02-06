@@ -23,6 +23,9 @@ export default class PlanSubscriber extends BaseModel {
   @belongsTo(() => Plan)
   declare plan: BelongsTo<typeof Plan>;
 
+  @column()
+  declare interestEarned: number;
+
   @hasMany(() => PlanSubscriber, {
     foreignKey: 'planId',
   })

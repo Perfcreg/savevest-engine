@@ -24,7 +24,7 @@ export default class PlanTransaction extends BaseModel {
   declare amount: number;
 
   @column()
-  declare transactionType: 'DEPOSIT' | 'WITHDRAWAL';
+  declare transactionType: 'DEPOSIT' | 'WITHDRAWAL' | 'INTEREST' | 'PENALTY';
 
   @column()
   declare reference: string;

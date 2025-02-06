@@ -12,11 +12,12 @@ import {
 } from '#validators/auth'
 import User from '#models/user'
 import Wallet from '#models/wallet'
+// import { stat } from 'fs'
 export default class AuthController {
 
-  
+
   /**
-  * @register
+  * @register[]
   * @description User registration endpoint.
   * @responseBody 201 - User Created successfully
   * @responseBody 403  - User Data Exists
@@ -35,21 +36,21 @@ export default class AuthController {
       // Validate the mobile number if the user already exists
       let mobile = await User.findBy('phone', payload.phone)
       if (mobile) throw new Error("Mobile number already registered")
-      // save the user data
-      const newUser = new User();
-      newUser.phone = payload.phone;
-      newUser.email = payload.email.toLowerCase();
-      newUser.password = payload.password;
-      newUser.firstName = payload.firstName;
-      newUser.lastName = payload.lastName
-      newUser.referal_by = payload.referal || '';
-      newUser.referral_code = `SV${referal_code}`;
-      newUser.referral_count = 0;
-      newUser.referral_incentives = 0;
-      
-      if (payload.referal) {
-        const referrer = await User.findBy('referral_code', payload.referal);
+
+      const newUser = await User.create({
+        phone: payload.phone,
+        email: payload.email.toLowerCase(),
+        password: payload.password,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        referal: `SV${referal_code}`
+      });
+
+      if (payload.referal !== '') {
+        const referrer = await User.findBy('referal', payload.referal);
         if (referrer) {
+          newUser.referal_by = referrer.id
+          newUser.save()
           referrer.referral_count += 1;
           await referrer.save();
         }
@@ -64,9 +65,9 @@ export default class AuthController {
         await newUser.save()
       } else {
         newUser.token = token
-        await newUser.save()
         const smsService = new SmsService();
         await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
+        await newUser.save()
       }
       return response.status(201).send({ message: "User created Successfully" })
     } catch (e) {
@@ -88,12 +89,40 @@ export default class AuthController {
       // Attempt to authenticate the user
       const user = await User.verifyCredentials(payload.email.toLowerCase(), payload.password)
       const accessToken = await User.accessTokens.create(user)
-      // Check if the user is active and not permanently inactive
-      if (user.isActive && !user.inactivePermantely) {
-        return response.status(200).send({ accessToken })
-      } else {
-        return response.status(403).send({ message: 'User is not active or is permanently inactive.' })
+      // Check user status and handle accordingly
+      if (user.inactivePermantely) {
+        return response.status(403).send({
+          message: 'Account is permanently inactive.',
+          status: 'PERMANENTLY_INACTIVE'
+        })
       }
+
+      if (!user.isActive) {
+        // Generate new verification token
+        const token = GenerateTokenHelper.generateToken(4)
+        user.token = token
+        await user.save()
+
+        // Send SMS with new token
+        const smsService = new SmsService()
+        await smsService.sendTokenVerificationSMS(`+234${user.phone}`, token)
+
+        return response.status(403).send({
+          message: 'Account requires verification. A new verification code has been sent.',
+          status: 'NEEDS_VERIFICATION'
+        })
+      }
+
+
+      if (user.fa) {
+        return response.status(200).send({
+          user: user.id,
+          message: "User 2fa enabled",
+          status: "requires2FA"
+        })
+      }
+
+      return response.status(200).send({ accessToken })
     } catch (error) {
       return response.status(401).send({ message: 'Invalid credentials.' })
     }
@@ -111,8 +140,9 @@ export default class AuthController {
   async resetPassword({ auth, request, response }: HttpContext) {
     const { ...payload } = await request.validateUsing(resetPasswordalidator)
     try {
-      const user = await auth.user!
+      const user = await auth.authenticate()
       user.password = payload.password
+      console.log("cant save")
       user.save()
       return response.status(200).send({ message: 'Password reset successfully' })
     } catch (e) {
@@ -138,7 +168,7 @@ export default class AuthController {
         throw new Error("User with this phone nuber not found")
       }
       const smsService = new SmsService();
-      await smsService.sendTokenVerificationSMS(phoneNumber, token)
+      await smsService.sendTokenVerificationSMS(`+234${phoneNumber}`, token)
       user.token = token
       user.save()
       return response.status(200).send({ message: "Password reset verification sent" })
@@ -163,7 +193,7 @@ export default class AuthController {
       user.token = ''
       user.isActive = true
       const paystackService = new PaystackService();
-      const createWallet =  await paystackService.createCustomer(user.email, user.firstName, user.lastName, user.phone)
+      const createWallet = await paystackService.createCustomer(user.email, user.firstName, user.lastName, user.phone)
       const wallet = new Wallet()
       wallet.amount = 0.0
       user.paystack_id = createWallet.customer_code
@@ -174,6 +204,28 @@ export default class AuthController {
       return response.forbidden(e.message)
     }
   }
+
+
+  async verifyReset({ request, response }: HttpContext) {
+    const { token } = await request.validateUsing(verifyTokenValidator)
+    try {
+      let user = await User.findBy('token', token)
+      if (!user) throw new Error("Invalid Token")
+      user.isActive = true
+      user.save()
+      const accessToken = await User.accessTokens.create(user)
+
+      // Check if the user is active and not permanently inactive
+      if (user.isActive && !user.inactivePermantely) {
+        return response.status(200).send({ accessToken })
+      } else {
+        return response.forbidden({ message: "User Verification not complete" })
+      }
+    } catch (e) {
+      return response.forbidden(e.message)
+    }
+  }
+
 
   /**
    * @resendToken
@@ -197,6 +249,74 @@ export default class AuthController {
       return response.badRequest(error.message)
     }
   }
-  
+
+  /**
+     * @resendToken
+     * @description Resend the token to the user.
+     * @responseBody 200 - Token resent successfully
+     * @responseBody 400 - Unable to send token
+     * @requestBody {}
+     */
+  async checkPassword({ request, response, auth }: HttpContext) {
+    try {
+      const user = await auth.use('api').authenticate()
+
+      const password = request.input('password')
+      // check if user password is correct
+      await User.verifyCredentials(user?.email, password)
+
+      // Get the bearer token from the authorization header
+      const bearerToken: any = request.header('Authorization')?.split('Bearer ')?.[1]
+      if (!bearerToken) {
+        return response.unauthorized({ message: 'No token provided' })
+      }
+
+      const checkToken = await user?.currentAccessToken
+
+      if (!checkToken) {
+        return response.unauthorized({ message: 'Invalid token' })
+      }
+
+      // delete and refresh token
+      await User.accessTokens.delete(user, checkToken.identifier)
+
+      // refresh token
+      const accessToken = await User.accessTokens.create(user)
+      return response.status(200).send({ accessToken })
+
+    } catch (error) {
+      return response.badRequest(error.message)
+    }
+  }
+
+
+  // logout
+  async logout({ response, auth }: HttpContext) {
+    const user = await auth.use('api').authenticate()
+    const checkToken = await user?.currentAccessToken
+    if (!checkToken) {
+      return response.unauthorized({ message: 'Invalid token' })
+    }
+    await User.accessTokens.delete(user, checkToken.identifier)
+    return response.status(200).send({ message: 'Logout successful' })
+  }
+
+  async verify2fa({ request, response }: HttpContext) {
+    const { token } = await request.validateUsing(verifyTokenValidator)
+    try {
+console.log(request.input('userId'))
+      const user = await User.findByOrFail('id',request.input('userId'))
+      if (user.pin == token) {
+        const accessToken = await User.accessTokens.create(user)
+        console.log(accessToken)
+        return response.status(200).send({ accessToken })
+      }
+       else {
+        throw new Error("Invalid Pin")
+      }
+    } catch (e) {
+      return response.forbidden(e.message)
+    }
+  }
 
 }

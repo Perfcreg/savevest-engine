@@ -42,9 +42,6 @@ export default class Plan extends BaseModel {
   declare userId: number;
 
   @column()
-  declare interestEarned: number;
-
-  @column()
   declare interestRate: number;
 
   @column()

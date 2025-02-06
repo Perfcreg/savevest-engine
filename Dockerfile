@@ -8,7 +8,7 @@ ENV NODE_ENV=production
 WORKDIR /app
 
 # Copy the environment file
-COPY env.production /app/.env
+COPY .env.production /app/.env
 COPY build /app/
 
 EXPOSE 3333

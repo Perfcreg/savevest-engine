@@ -166,10 +166,10 @@ If you find this project helpful and would like to support its development, you 
 
 | Coin | Network | Address |
 |------|---------|----------|
-| ![BTC](https://img.shields.io/badge/Bitcoin-F7931A?style=flat&logo=bitcoin&logoColor=white) | Bitcoin | `` |
-| ![ETH](https://img.shields.io/badge/Ethereum-3C3C3D?style=flat&logo=ethereum&logoColor=white) | Ethereum | `` |
-| ![USDT](https://img.shields.io/badge/Tether-50AF95?style=flat&logo=tether&logoColor=white) | TRC20 | `` |
-| ![BNB](https://img.shields.io/badge/BNB-F0B90B?style=flat&logo=binance&logoColor=white) | BSC | `` |
+| ![BTC](https://img.shields.io/badge/Bitcoin-F7931A?style=flat&logo=bitcoin&logoColor=white) | Bitcoin | `14tJWtNbHVR3gNJcBRy3jNbwRDTYVem7xu` |
+| ![ETH](https://img.shields.io/badge/Ethereum-3C3C3D?style=flat&logo=ethereum&logoColor=white) | Ethereum | `0xa74235a34bdb8a9e82e6cd518e86441d26d2230c` |
+| ![USDT](https://img.shields.io/badge/Tether-50AF95?style=flat&logo=tether&logoColor=white) | TRC20 | `TTEmPwHMk9fSFeCX5xEG91LmnwQQrqb2g2` |
+| ![BNB](https://img.shields.io/badge/BNB-F0B90B?style=flat&logo=binance&logoColor=white) | BSC | `0xa74235a34bdb8a9e82e6cd518e86441d26d2230c` |
 
 ### 📬 Contact
 Oyewo Oluwafemi

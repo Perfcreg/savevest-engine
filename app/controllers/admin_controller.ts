@@ -136,7 +136,7 @@ export default class AdminController {
         .orderBy('created_at')
 
       const chartData = dailyFunds.map(fund => ({
-        hour: DateTime.fromJSDate(fund?.createdAt).toFormat('HH:00'),
+        hour: DateTime.fromJSDate(fund.createdAt).toFormat('HH:00'),
         amount: Number(fund?.totalAmount)
       }))
 

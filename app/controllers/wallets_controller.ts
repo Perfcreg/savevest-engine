@@ -13,7 +13,6 @@ import PlanTransaction from '#models/plans_transaction'
 import Plan from '#models/plan'
 import PlanSubscriber from '#models/plan_subcriber'
 import UserCard from '#models/user_card'
-// const { DateTime } = require('luxon')
 
 
 
@@ -26,6 +25,41 @@ export default class WalletsController {
     this.paystackService = new PaystackService()
     this.notificationService = new NotificationService()
   }
+
+
+  private async updateAssociatedPlans(userId: number, userEmail: string, newAuthorizationCode: string) {
+    const paystackService = new PaystackService();
+    const subscriptions = await paystackService.listSubscriptions(userEmail);
+    console.log(newAuthorizationCode)
+    for (const subscription of subscriptions) {
+      try {
+        // Update the subscription with the new authorization code
+        await paystackService.enableSubscription(subscription.subscription_code, newAuthorizationCode);
+
+        // Update the subscription in your database
+        await this.updateSubscriptionInDatabase(userId, subscription.subscription_code, newAuthorizationCode);
+      } catch (error) {
+        console.error(`Failed to update subscription ${subscription.subscription_code}:`, error);
+        // Implement error handling or retry logic here
+      }
+    }
+    // console.log(subscriptions)
+  }
+
+  private async updateSubscriptionInDatabase(userId: number, subscriptionCode: string, newAuthorizationCode: string) {
+    const PlanSubscriber = (await import('#models/plan_subcriber')).default;
+
+    const planSubscriber = await PlanSubscriber.query()
+      .where('user_id', userId)
+      .where('subscription_code', subscriptionCode)
+      .first();
+
+    if (planSubscriber) {
+      planSubscriber.emailToken = newAuthorizationCode;
+      await planSubscriber.save();
+    }
+  }
+
 
   async createWithdrawal({ auth, request, response }: HttpContext) {
     try {
@@ -168,9 +202,46 @@ export default class WalletsController {
     const transactionData = eventData.data
 
 
+    // user add new card and charge was succefull
+
+    if (event == 'charge.success' && transactionData.channel == 'card' && transactionData.metadata?.custom_fields?.[0]?.variable_name == 'Add_Card') {
+      console.log('na me trigger')
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+
+      await UserCard.create({
+        cardType: transactionData.authorization.card_type,
+        expire: `${transactionData.authorization.exp_month}/ ${transactionData.authorization.exp_year}`,
+        lastFour: transactionData.authorization.last4,
+        token: transactionData.authorization.authorization_code,
+        signature: transactionData.authorization.signature,
+        userId: user.id
+      })
+      const wallet = await Wallet.findByOrFail('user_id', user.id)
+
+      const newBalance = (Number(wallet.amount) + (transactionData.amount / 100)); // Update balance
+      await wallet.merge({ amount: newBalance }).save();
+
+      await WalletTransaction.create({
+        amount: 100,
+        transactionType: 'DEPOSIT',
+        userId: user.id,
+        reference: transactionData.reference,
+        walletId: wallet.id,
+        totalAmount: 100,
+        transactionDate: transactionData.paidAt,
+      })
+
+      await this.notificationService.sendPushNotification(
+        user,
+        '💳 Card Added Successfully',
+        `Your card has been successfully added, ₦${transactionData.amount / 100}.00 has been added to your wallet ✅`,
+        { type: 'card_added' }
+      )
+    }
+
     //subscription.create
-    if (event === 'subscription.create') {
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+    if (event == 'subscription.create') {
+      const user = await User.findByOrFail('email', transactionData.customer.email)
 
       await this.notificationService.sendPushNotification(
         user,
@@ -180,47 +251,12 @@ export default class WalletsController {
       )
     }
 
-    // user add new card and charge was succefull
-    if (event === 'charge.success' && transactionData.channel === 'card' && transactionData.amount == 1000) {
-      const user = await User.findByOrFail('paystack_id', transactionData.customer.customer_code)
-
-      await UserCard.create({
-        cardType : transactionData.auhorization.card_type,
-        expire: `${transactionData.auhorization.exp_month}/ ${transactionData.auhorization.exp_year}`,
-        lastFour: transactionData.auhorization.last4,
-        token: transactionData.auhorization.authorization_code,
-        signature: transactionData.auhorization.signature,
-        userId: user.id
-      })
-      const wallet = await Wallet.findByOrFail('userId', user.id)
-
-      await wallet.merge({
-        amount: wallet.amount + transactionData.amount
-      }).save();
-
-      await WalletTransaction.create({
-        amount: 100,
-        transactionType: 'DEPOSIT',
-        userId: user.id,
-        reference:transactionData.reference,
-        walletId: wallet.id,
-        totalAmount: 100,
-        transactionDate: transactionData.paidAt,
-      })
-
-      await this.notificationService.sendPushNotification(
-        user,
-        '💳 Card Added Successfully',
-        `Your card has been successfully charged for  ✅`,
-        { type: 'card_added' }
-      )
-    }
-
     // user fund a plan via card or any means
-    // user fund a plan via card or any means
-    if (event === 'charge.success' && transactionData.metadata?.plan_id) {
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
-      const plan = await Plan.findOrFail(transactionData.metadata.plan_id)
+    if (event == 'charge.success' && transactionData.metadata?.plan_id) {
+      console.log('na me 2 trigger')
+
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+      const plan = await Plan.findByOrFail('plan_code', transactionData.metadata.plan_id)
 
       // Record plan transaction
       await PlanTransaction.create({
@@ -232,11 +268,14 @@ export default class WalletsController {
         transactionDate: transactionData.paid_at
       })
 
-      // Update subscriber balance
-      const planSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
-      await planSubscriber.merge({
-        currentAmount: planSubscriber.currentAmount + (transactionData.amount / 100)
-      }).save()
+      await PlanSubscriber
+        .query()
+        .where('user_id', user.id)
+        .increment('currentAmount', Number(transactionData.amount / 100))
+
+      // Fetch the updated record to confirm
+      const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
+      console.log('Updated amount:', updatedSubscriber.currentAmount)
 
       // Send notification
       await this.notificationService.sendPushNotification(
@@ -247,14 +286,25 @@ export default class WalletsController {
       )
     }
 
-
-
     // User was charged for a plan
-    if (event === 'charge.success' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor === Object) {
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+    if (event == 'charge.success' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor == Object) {
+      console.log('na me 3 trigger')
 
-      const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code || 'PLN_gyhhlvkbevfws94')
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+
+      const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code)
       // add transaction to saving 
+
+     await PlanSubscriber
+        .query()
+        .where('user_id', user.id)
+        .increment('currentAmount', Number(transactionData.amount / 100))
+
+      // Fetch the updated record to confirm
+      const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
+      console.log('Updated amount:', updatedSubscriber.currentAmount)
+
+
       await PlanTransaction.create({
         userId: user?.id,
         amount: transactionData.amount / 100,
@@ -264,12 +314,6 @@ export default class WalletsController {
         transactionDate: transactionData.paid_at,
         // planId: 
       })
-
-      // update plan subscriber amount
-      const plan_subcriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
-      plan_subcriber.currentAmount += transactionData.amount / 100
-      plan_subcriber.save()
-
 
       await this.notificationService.sendPushNotification(
         user,
@@ -281,8 +325,8 @@ export default class WalletsController {
 
     // Plan Canceled
 
-    if (event === "subscription.disable") {
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
+    if (event == "subscription.disable") {
+      const user = await User.findBy('email', transactionData.customer.email)
       await this.notificationService.sendPushNotification(
         user,
         '😢 Subscription Canceled',
@@ -292,20 +336,20 @@ export default class WalletsController {
     }
 
     // charge success from a dedicated_nuban
-    if (event === "charge.success" && transactionData.channel === "dedicated_nuban") {
+    if (event == "charge.success" && transactionData.channel == "dedicated_nuban") {
 
-      const user = await User.findBy('paystack_id', transactionData.customer.customer_code)
-      // update user wallet amount to add funds
-      const wallet = await Wallet.findByOrFail('user_id', user?.id)
-      const newBalance = (Number(wallet.amount) + (transactionData.amount / 100)); // Update balance
-      await wallet.merge({ amount: newBalance }).save();
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+      const wallet  = await Wallet
+        .query()
+        .where('user_id', user.id)
+        .increment('amount', Number(transactionData.amount / 100))
       // save transaction to history
       const transaction = new WalletTransaction()
-      transaction.walletId = wallet.id;
+      transaction.walletId = wallet?.id;
       transaction.amount = transactionData.amount / 100;
       transaction.transactionType = 'DEPOSIT';
       transaction.reference = transactionData.reference;
-      transaction.userId = wallet.user_id
+      transaction.userId = user.id
       await transaction.save(); // Save transaction to history
 
       await this.notificationService.sendPushNotification(
@@ -358,7 +402,7 @@ export default class WalletsController {
       }
 
       const paystack = new PaystackService();
-      const { data } = await paystack.addDeposit(user.email, amount, ref, ref);
+      const { data } = await paystack.addDeposit(user.email, amount, ref);
       if (data.status) {
         // Using a database transaction to ensure atomicity
         await wallet.merge({
@@ -401,9 +445,9 @@ export default class WalletsController {
       perPage: 10,
     })
     const WalletPaystackTransactions = paystackTransactions.filter((transaction: { channel: string; customer: { customer_code: string } }) =>
-      transaction.channel === "bank_transfer" &&
+      transaction.channel == "bank_transfer" &&
       transaction.customer && // Ensure customer object exists
-      transaction.customer.customer_code === user.paystack_id
+      transaction.customer.customer_code == user.paystack_id
     ).map((object: { amount: number; created_at: any; reference: any; status: any; id: any }) => {
       return {
         amount: object.amount / 100,
@@ -441,7 +485,7 @@ export default class WalletsController {
     const wallet = await Wallet.findBy('user_id', user.id)
     const amount = request.input('amount')
     const paystack = new PaystackService()
-    const { data } = await paystack.addDeposit(user.email, amount, GenerateTokenHelper.generateAlphanumeric(12), 'wallet')
+    const { data } = await paystack.addDeposit(user.email, amount, GenerateTokenHelper.generateAlphanumeric(12))
     if (data.status) {
       await wallet?.merge({
         amount: wallet.amount + amount

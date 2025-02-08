@@ -146,8 +146,6 @@ export default class PlansController {
     // 
     try {
       const plan = await Plan.findByOrFail('plan_code', params.plan_code)
-      console.log(plan)
-      // const plan_subscribers =  await this.paystackService.getPlan(params.plan_code)
       return response.status(200).json({
         plan
       });
@@ -253,6 +251,15 @@ export default class PlansController {
         throw new Error('This savings plan is locked and cannot be broken');
       }
 
+      if (plan?.status == "Cancelled") {
+        throw new Error('This savings plan has been cancelled');
+      }
+
+
+      if (plan?.status == "Completed") {
+        throw new Error('This savings plan has been completed');
+      }
+
       // check if plan is less than 30 days
       const now = DateTime.now();
       const end = DateTime.fromJSDate(plan?.endDate ?? new Date());
@@ -262,21 +269,28 @@ export default class PlansController {
       }
       const response = await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
 
+      await plan.merge({
+        endDate: DateTime.now(),
+        status: "Cancelled"
+      }).save();
 
-      plan?.endDate == DateTime.now()
-      plan?.status == 'Cancelled'
-      await plan?.save()
-      const userWallet = await Wallet.findBy('user_id', user.id)
-      if (userWallet) {
-        userWallet.amount += plan?.currentAmount || 0
-        await userWallet.save()
-      }
+      const wallet = await Wallet
+        .query()
+        .where('user_id', user.id)
+        .increment('amount', Number(plan?.currentAmount))
+
+      // Fetch the updated record to confirm
+      const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
+      console.log('Updated amount:', updatedSubscriber.currentAmount)
+
+      const realPlan = await Plan.findBy('id', plan?.planId)
+
       await WalletTransaction.create({
         userId: user.id,
         amount: plan?.currentAmount,
         transactionType: 'DEPOSIT',
-        reference: plan.plan.planCode,
-        walletId: userWallet?.id,
+        reference: realPlan?.planCode,
+        walletId: wallet?.id
       })
       return response.status(200).json({ message: 'Plan unsubscribed successfull' });
 
@@ -332,7 +346,7 @@ export default class PlansController {
         invitedUser,
         '🎉 Plan Invite',
         // Plan invite notification message
-        `${user.username} has invited you to join the ${plan.name} savings plan. use the code ${plan.planCode} to join` ,
+        `${user.username} has invited you to join the ${plan.name} savings plan. use the code ${plan.planCode} to join`,
         { type: 'plan_invite' }
       )
       // send email

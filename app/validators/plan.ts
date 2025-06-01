@@ -11,7 +11,6 @@ export const createValidator = vine.compile(
       description: vine.string(),
       amount: vine.number(),
       plan_id: vine.number(),
-      time: vine.string(),
       plan_type: vine.enum(['SAVING', 'AJO', 'PERSONAL', 'GROUP']),
       target_amount: vine.number(),
       interest: vine.number(),

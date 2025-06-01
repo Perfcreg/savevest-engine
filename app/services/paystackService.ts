@@ -309,6 +309,16 @@ class PaystackService {
             throw new Error(`Error fetching user card transactions: ${error.message}`)
         }
     }
+
+    // validate customer
+    async validateCustomer(data: Object) {
+        try {
+            const response = await this.paystack.customer.validate(data)
+            return response.data
+        } catch (error) {
+            throw new Error(`Error validating customer: ${error.message}`)
+        }
+    }
 }
 
 export default PaystackService

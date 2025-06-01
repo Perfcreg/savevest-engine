@@ -10,6 +10,7 @@ WORKDIR /app
 # Copy the environment file
 COPY .env.production /app/.env
 COPY build /app/
+RUN yarn
 
 EXPOSE 3333
 

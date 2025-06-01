@@ -1,4 +1,4 @@
-import { createPinValidator, photoUploadValidator, updateKinValidator, updatePasswordValidator, updatePhoneNumberValidator, updatePinValidator, updateProfileValidator, verifyPinValidator } from '#validators/user'
+import { bvnValidator, createPinValidator, photoUploadValidator, updateKinValidator, updatePasswordValidator, updatePhoneNumberValidator, updatePinValidator, updateProfileValidator, verifyPinValidator } from '#validators/user'
 import type { HttpContext } from '@adonisjs/core/http'
 import SmsService from '#services/smsService'
 import { uploadToS3 } from '#services/awsService'
@@ -8,6 +8,7 @@ import app from '@adonisjs/core/services/app'
 import fs, { ReadStream } from 'fs'
 import { SmileIDService } from '#services/smileIdservice'
 import IncentiveService from '#services/incentiveService'
+import PaystackService from '#services/paystackService'
 export default class UsersController {
     async getUserIncentives({ auth, response }: HttpContext) {
         try {
@@ -39,13 +40,13 @@ export default class UsersController {
     }
 
     /**
- * @updateProfile
- * @description User update Profile endpoint.
- * @requestBody {"gender": "MALE", "username": "johndoe","fullName": "John Doe", "dateOfBirth": "1990-01-01"}
- * @responseBody 200 - {"message": "Profile updated successfully"}
- * @responseBody 422 - {"errors": ["Validation error message"]}
- * @responseBody 500 - {"error": "Something went wrong" }
- */
+     * @updateProfile
+     * @description User update Profile endpoint.
+     * @requestBody {"gender": "MALE", "username": "johndoe","fullName": "John Doe", "dateOfBirth": "1990-01-01"}
+     * @responseBody 200 - {"message": "Profile updated successfully"}
+     * @responseBody 422 - {"errors": ["Validation error message"]}
+     * @responseBody 500 - {"error": "Something went wrong" }
+     */
     async updateProfile({ auth, response, request }: HttpContext) {
         try {
             // Validate the request payload
@@ -107,6 +108,7 @@ export default class UsersController {
             return response.status(500).send({ error: 'Something went wrong' })
         }
     }
+
 
 
     /** 
@@ -207,7 +209,7 @@ export default class UsersController {
         const { ...payload } = await request.validateUsing(updatePinValidator)
         try {
             let user = await auth.user!
-            if (user.pin !== payload.old_pin){
+            if (user.pin !== payload.old_pin) {
                 return response.status(400).json({
                     message: "Invalid Pin Combination, chooose someting different"
                 })
@@ -234,7 +236,7 @@ export default class UsersController {
             }
             user.pin = payload.new_pin
             await user.save()
-            return response.status(204).send({ message: "User pin changed successfully" })
+            return response.status(200).send({ message: "User pin changed successfully" })
         } catch (e) {
             return response.forbidden(e.message)
         }
@@ -355,36 +357,22 @@ export default class UsersController {
     async updateKyc({ auth, response, request }: HttpContext) {
         try {
             const user = await auth.authenticate();
-            const bvn = request.input('bvn');
-            const smileIdservice = new SmileIDService();
-            const sendVerify = await smileIdservice.submitKYCJob({
-                job_id: bvn,
-                job_type: 5,
-                user_id: user.referal,
-            }, {
+            const payload = await request.validateUsing(bvnValidator)
+
+            const paystack = new PaystackService()
+            const verifyUser = await paystack.validateCustomer({
                 first_name: user.firstName,
                 last_name: user.lastName,
-                country: 'Nigeria',
-                id_type: 'BVN',
-                id_number: bvn,
-                dob: user.dob,
-                phone_number: user.phone,
-
+                type: 'bvn',
+                country: 'NG',
+                value: payload.bvn,
+                id: user.paystack_id
             })
-            console.log(sendVerify)
-            if (sendVerify.ResultText == 'ID Number Validated' || sendVerify.ResultCode == 1012) {
-                await user.merge({
-                    kyc: true
-                }).save()
-                return response.status(200).send({
-                    message: 'KYC Verification Successful'
-                })
-            } else {
-                return response.status(400).send({
-                    message: 'KYC Verification Failed'
-                })
-            }
+            return response.status(200).send({
+                message: 'KYC Verification submitted, Paystack system will handle it'
+            })
         } catch (error) {
+            console.log(error)
             return response.status(400).send({
                 message: 'KYC Verification Failed'
             })

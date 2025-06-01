@@ -43,15 +43,16 @@ export default class AuthController {
         password: payload.password,
         firstName: payload.firstName,
         lastName: payload.lastName,
-        referal: `SV${referal_code}`
+        referal: referal_code
       });
 
       if (payload.referal !== '') {
-        const referrer = await User.findBy('referal', payload.referal);
+        const referrer = await User.findByOrFail('referal', payload.referal);
         if (referrer) {
           newUser.referal_by = referrer.id
           newUser.save()
-          referrer.referral_count += 1;
+          // increment referra_ cont
+          referrer.referral_count = referrer.referral_count + 1;
           await referrer.save();
         }
       }
@@ -142,7 +143,6 @@ export default class AuthController {
     try {
       const user = await auth.authenticate()
       user.password = payload.password
-      console.log("cant save")
       user.save()
       return response.status(200).send({ message: 'Password reset successfully' })
     } catch (e) {
@@ -304,11 +304,9 @@ export default class AuthController {
   async verify2fa({ request, response }: HttpContext) {
     const { token } = await request.validateUsing(verifyTokenValidator)
     try {
-console.log(request.input('userId'))
       const user = await User.findByOrFail('id',request.input('userId'))
       if (user.pin == token) {
         const accessToken = await User.accessTokens.create(user)
-        console.log(accessToken)
         return response.status(200).send({ accessToken })
       }
        else {

@@ -50,15 +50,38 @@ router
   .prefix('/api/auth')
   .use(apiThrottle)
 
-router
+  router
   .group(() => {
-    router.get('/users', [AdminController, 'getUserList'])
+    // User Management Routes
+    router.get('/users/:page/:limit', [AdminController, 'getUsers'])    
     router.post('/users', [AdminController, 'createUser'])
+    router.get('/users/:userId', [AdminController, 'getSingleUser'])
     router.put('/users/:userId/ban', [AdminController, 'banUser'])
-    router.get('/withdrawals', [AdminController, 'checkWithdrawals'])
+    router.get('/users/:userId/stats', [AdminController, 'getUserStats'])
+
+    // Analytics Routes
     router.get('/analytics/daily', [AdminController, 'getDailyAnalytics'])
     router.get('/analytics/monthly', [AdminController, 'getMonthlyAnalytics'])
     router.get('/dashboard-data', [AdminController, 'getDashboardData'])
+    router.get('/user-dashboard-data', [AdminController, 'getUserDashboardData'])
+
+
+    // Transaction Routes
+    router.get('/transactions', [AdminController, 'getAllTransactions'])
+    router.get('/plan-transactions', [AdminController, 'getPlanTransactions'])
+
+    // Wallet Routes
+    router.get('/wallets', [AdminController, 'getAllWallets'])
+
+    // Withdrawal Routes
+    router.get('/withdrawals', [AdminController, 'checkWithdrawals'])
+    router.get('/withdrawals/all', [AdminController, 'getAllWithdrawals'])
+    router.put('/withdrawals/:withdrawalId/approve', [AdminController, 'approveWithdrawal'])
+
+    // Plan Management Routes
+    router.get('/plan-subscriptions', [AdminController, 'getPlanSubscriptions'])
+    router.post('/plan-types', [AdminController, 'createPlanType'])
+    router.put('/plan-types/:planTypeId', [AdminController, 'updatePlanType'])
   })
   .prefix('/api/admin')
   .use(middleware.auth())
@@ -67,9 +90,12 @@ router
 
 
 
+
 router
   .group(() => {
     router.post('/paystack', [WalletController, 'handlePaystackWebhook'])
+    router.post('/smileid', [WalletController, 'handleSmileIdWebhook'])
+
   })
   .prefix('/api')
 
@@ -143,7 +169,6 @@ router
   .use(middleware.auth());
 
 
-
 router
   .group(() => {
     router.get('/', [PlanController, 'index']);
@@ -176,6 +201,3 @@ router.get("/docs", async () => {
   return AutoSwagger.default.ui("/swagger", swagger);
   // return AutoSwagger.default.rapidoc("/swagger", swagger); to use RapiDoc instead
 });
-
-
-

@@ -3,6 +3,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 import UserBank from '#models/user_bank';
 // import User from '#models/user';
 import { bankValidator } from '#validators/user_bank'; // Replace 'path-to-bank-validator' with the actual path
+import PaystackService from '#services/paystackService';
 
 export default class UserBanksController {
 
@@ -32,7 +33,7 @@ export default class UserBanksController {
   async addBank({ auth, request, response }: HttpContext) {
     const user = await auth.authenticate()
     const { bank_code, account_number, bank_name } = await request.validateUsing(bankValidator);
-   
+
     try {
       const userBank = new UserBank();
       userBank.user_id = user.id;
@@ -46,6 +47,9 @@ export default class UserBanksController {
           message: "Bank already exists",
         });
       }
+
+     
+
       const allBanks = await UserBank.findManyBy("user_id", user.id)
       if (allBanks.length >= 2) {
         return response.status(400).json({
@@ -53,6 +57,8 @@ export default class UserBanksController {
         });
       }
       await userBank.save();
+
+
 
       return response.status(201).send({
         message: 'Bank account added successfully',

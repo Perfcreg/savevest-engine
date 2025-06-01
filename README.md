@@ -119,6 +119,18 @@ run migration
 node ace migration:run
 ```
 
+seed the database for development
+```
+# Run all seeders
+node ace db:seed
+
+# Run a specific seeder
+node ace db:seed --files=./database/seeders/user_seeder.ts
+
+# Run the main seeder which includes all seeders in the correct order
+node ace db:seed --files=./database/seeders/main_seeder.ts
+```
+
 start the development server
 ```
 node ace serve --watch

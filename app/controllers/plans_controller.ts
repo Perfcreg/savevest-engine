@@ -427,11 +427,7 @@ export default class PlansController {
 
 
       return response.status(200).send({
-        message: 'Savings broken successfully, All savings has been added to wallet.',
-        data: {
-          amountReturned: amountToReturn,
-          penalty: penalty,
-        },
+        message: 'Plan Savings Breaked successfully',
       });
     } catch (error) {
       return response.forbidden(error.message);

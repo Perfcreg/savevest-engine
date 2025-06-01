@@ -27,10 +27,10 @@ export default class PlanTransaction extends BaseModel {
   declare transactionType: 'DEPOSIT' | 'WITHDRAWAL' | 'INTEREST' | 'PENALTY';
 
   @column()
-  declare reference: string;
+  declare receiptId: string;
 
-  @column.dateTime({ autoCreate: true })
-  declare transactionDate: DateTime;
+  @column()
+  declare transactionId: string;
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime

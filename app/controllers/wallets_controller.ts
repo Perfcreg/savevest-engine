@@ -258,14 +258,15 @@ export default class WalletsController {
       const user = await User.findByOrFail('email', transactionData.customer.email)
       const plan = await Plan.findByOrFail('plan_code', transactionData.metadata.plan_id)
 
+
       // Record plan transaction
       await PlanTransaction.create({
         userId: user?.id,
         amount: transactionData.amount / 100,
         transactionType: 'DEPOSIT',
-        reference: transactionData.reference,
-        planId: plan.id,
-        transactionDate: transactionData.paid_at
+        receiptId: transactionData.reference,
+        transactionId: transactionData.id,
+        planId: plan.id
       })
 
       await PlanSubscriber
@@ -295,7 +296,7 @@ export default class WalletsController {
       const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code)
       // add transaction to saving 
 
-     await PlanSubscriber
+      await PlanSubscriber
         .query()
         .where('user_id', user.id)
         .increment('currentAmount', Number(transactionData.amount / 100))
@@ -304,15 +305,13 @@ export default class WalletsController {
       const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
       console.log('Updated amount:', updatedSubscriber.currentAmount)
 
-
       await PlanTransaction.create({
         userId: user?.id,
         amount: transactionData.amount / 100,
         transactionType: 'DEPOSIT',
-        reference: transactionData.reference,
+        receiptId: transactionData.reference,
+        transactionId: transactionData.id,
         planId: plan.id,
-        transactionDate: transactionData.paid_at,
-        // planId: 
       })
 
       await this.notificationService.sendPushNotification(
@@ -339,30 +338,83 @@ export default class WalletsController {
     if (event == "charge.success" && transactionData.channel == "dedicated_nuban") {
 
       const user = await User.findByOrFail('email', transactionData.customer.email)
-      const wallet  = await Wallet
-        .query()
-        .where('user_id', user.id)
-        .increment('amount', Number(transactionData.amount / 100))
+
+
+      let wallet = await Wallet.findBy('user_id', user.id)
+
+      if (wallet) {
+        // Increment existing wallet amount
+        await wallet.merge({
+          amount: wallet.amount + Number(transactionData.amount / 100)
+        }).save()
+      } else {
+        // Create new wallet with initial amount
+       wallet =  await Wallet.create({
+          user_id: user.id,
+          amount: Number(transactionData.amount / 100)
+        })
+      }
+
       // save transaction to history
       const transaction = new WalletTransaction()
-      transaction.walletId = wallet?.id;
-      transaction.amount = transactionData.amount / 100;
-      transaction.transactionType = 'DEPOSIT';
-      transaction.reference = transactionData.reference;
+      transaction.walletId = wallet?.id
+      transaction.amount = transactionData.amount / 100
+      transaction.transactionType = 'DEPOSIT'
+      transaction.reference = transactionData.reference
       transaction.userId = user.id
-      await transaction.save(); // Save transaction to history
+      await transaction.save()
 
       await this.notificationService.sendPushNotification(
         user,
         '💰 Savevest Wallet Deposit',
-        // `Your deposit of ${transactionData.amount / 100} was successfull`,
-        `A deposit of ₦${transactionData.amount / 100} has been added to your wallet. Your new Savevest wallet balance  is ₦${wallet.amount}. Keep growing! 📈 `,
+        `A deposit of ₦${transactionData.amount / 100} has been added to your wallet. 
+        Your new Savevest wallet balance is ₦${updatedWallet.amount}. Keep growing! 📈 `,
         { type: 'deposit_successful' }
       )
     }
 
+    if (event == "customeridentification.success"){
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+      await user.merge({ kyc: true }).save()
+      await this.notificationService.sendPushNotification(
+        user,
+        '🎉 KYC Completed Successful',
+        `Your BVN has been approved successfully`,
+        { type: 'subscription_created' }
+      )
+    }
+
+    if (event == "customeridentification.failed"){
+      const user = await User.findByOrFail('email', transactionData.customer.email)
+      await this.notificationService.sendPushNotification(
+        user,
+        'BVN failed ',
+        `Account number or BVN is incorrect`,
+        { type: 'verifivationa_failed' }
+      )
+    }
     return response.status(200).send({ message: 'Webhook processed successfully' })
   }
+
+  async handleSmileIdWebhook({ request, response }: HttpContext) {
+    console.log(request.raw)
+    const body = request.body()
+    const data = body.data
+    const user = await User.findBy('email', data.email)
+    if (data.status == 'approved') {
+      await user?.merge({ kyc: true }).save()
+      await this.notificationService.sendPushNotification(
+        user,
+        '🎉 KYC Completed Successful',
+        `Your BVN has been approved successfully`,
+        { type: 'subscription_created' }
+      )
+    } else {
+      await user?.merge({ kyc: false }).save()
+    }
+  }
+
+
   /**
    * Display a list of resource
    */
@@ -496,15 +548,14 @@ export default class WalletsController {
   /**
    * Handle form submission for the edit action
    */
-  // async update({ params, request }: HttpContext) {}
-
-  // create DVA
 
   async createDVA({ auth, response }: HttpContext) {
     const user = await auth.user!
+    if(!user.kyc){
+      return response.status(400).json({ message: "Please complete your KYC" })
+    }
     const paystack = new PaystackService()
-    const data = await paystack.createDedicatedVirtualAccount(user.paystack_id)
-    console.log(data)
+    const data = await paystack.createDedicatedVirtualAccount(user.email)
     const userBank = await UserBank.create({
       user_id: user.id,
       bankCode: "DVA",

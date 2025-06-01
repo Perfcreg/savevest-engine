@@ -80,3 +80,10 @@ export const updateKinValidator = vine.compile(
     kin: vine.string().trim()
   })
 )
+
+// BVN input Validator
+export const bvnValidator = vine.compile(
+  vine.object({
+    bvn: vine.string().maxLength(11),
+  })
+)

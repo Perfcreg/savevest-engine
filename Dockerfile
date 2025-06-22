@@ -1,17 +1,20 @@
-FROM node:20.12.2-alpine3.18 as base
-
+# Multi-stage build for AdonisJS
+FROM node:18-alpine AS base
 WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 
-# Production stage
-FROM base
-ENV NODE_ENV=production
+FROM base AS build
+COPY . .
+RUN yarn build
+
+FROM node:18-alpine AS production
 WORKDIR /app
-
-# Copy the environment file
-COPY .env.production /app/.env
-COPY build /app/
-RUN yarn
+COPY package.json yarn.lock ./
+RUN yarn install --production --frozen-lockfile && yarn cache clean
+COPY --from=build /app/build ./build
+COPY --from=build /app/ace ./ace
+COPY --from=build /app/adonisrc.ts ./adonisrc.ts
 
 EXPOSE 3333
-
-CMD ["node", "./bin/server.js"]
+CMD ["node", "ace", "serve", "--watch"]

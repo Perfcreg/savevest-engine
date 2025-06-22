@@ -12,6 +12,7 @@ import WalletTransaction from '#models/wallet_transaction';
 import hash from '@adonisjs/core/services/hash';
 import GenerateTokenHelper from '#services/generateToken';
 import UserCard from '#models/user_card';
+import PlanTransaction from '#models/plans_transaction';
 export default class PlansController {
 
   private paystackService: PaystackService
@@ -255,7 +256,6 @@ export default class PlansController {
         throw new Error('This savings plan has been cancelled');
       }
 
-
       if (plan?.status == "Completed") {
         throw new Error('This savings plan has been completed');
       }
@@ -453,6 +453,61 @@ export default class PlansController {
       return response.status(200).send(plan.transactions);
     } catch (error) {
       return response.forbidden(error.message);
+    }
+  }
+
+  /**
+   * @fundPlanFromWallet
+   * @description Move funds from wallet to a savings plan (no Paystack/card required)
+   * @requestBody { plan_id: number, amount: number }
+   * @responseBody 200 - Funds added to plan successfully
+   * @responseBody 400 - Insufficient funds or invalid request
+   */
+  async fundPlanFromWallet({ auth, request, response }: HttpContext) {
+    try {
+      const user = auth.user!;
+      const { plan_id, amount } = request.only(['plan_id', 'amount']);
+      if (!plan_id || !amount || isNaN(amount) || amount <= 0) {
+        return response.badRequest({ message: 'Invalid plan or amount' });
+      }
+      // Find wallet and plan
+      const wallet = await Wallet.findByOrFail('user_id', user.id);
+      if (wallet.amount < Number(amount)) {
+        return response.badRequest({ message: 'Insufficient wallet balance' });
+      }
+      const planSub = await PlanSubscriber.query().where('user_id', user.id).where('plan_id', plan_id).first();
+      if (!planSub) {
+        return response.badRequest({ message: 'You are not subscribed to this plan' });
+      }
+      if (planSub.status !== 'Active') {
+        return response.badRequest({ message: 'Plan is not active' });
+      }
+      // Deduct from wallet
+      wallet.amount -= Number(amount);
+      await wallet.save();
+      // Add to plan
+      planSub.currentAmount = (planSub.currentAmount || 0) + Number(amount);
+      await planSub.save();
+      // Record wallet transaction
+      await WalletTransaction.create({
+        userId: user.id,
+        amount: Number(amount),
+        transactionType: 'WITHDRAWAL',
+        reference: `PLAN_${plan_id}`,
+        walletId: wallet.id
+      });
+      // Record plan transaction
+      await PlanTransaction.create({
+        userId: user.id,
+        planId: plan_id,
+        amount: Number(amount),
+        transactionType: 'DEPOSIT',
+        receiptId: `WALLET_${wallet.id}`,
+        transactionId: `PLAN_${plan_id}_${Date.now()}`
+      });
+      return response.ok({ message: 'Funds added to plan successfully' });
+    } catch (error) {
+      return response.internalServerError({ message: 'Error funding plan from wallet', error: error.message });
     }
   }
 

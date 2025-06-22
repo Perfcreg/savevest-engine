@@ -6,7 +6,6 @@ import GenerateTokenHelper from '#services/generateToken'
 import hash from '@adonisjs/core/services/hash'
 import app from '@adonisjs/core/services/app'
 import fs, { ReadStream } from 'fs'
-import { SmileIDService } from '#services/smileIdservice'
 import IncentiveService from '#services/incentiveService'
 import PaystackService from '#services/paystackService'
 export default class UsersController {

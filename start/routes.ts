@@ -163,6 +163,7 @@ router
     router.put('/:id/lock', [PlanController, 'lockSavings'])
     router.put('/:id/break', [PlanController, 'cancelSubscription'])
     router.get('/:id/transactions', [PlanController, 'getCustomerTransactions'])
+    router.post('/fundplan', [PlanController, 'fundPlanFromWallet'])
   })
   .prefix('/api/user/plan')
   .use(apiThrottle)

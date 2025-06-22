@@ -1,9 +1,7 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { inject } from '@adonisjs/core'
 import User from '#models/user'
 import { verifyTwoFactorValidator } from '#validators/two_factor'
 
-@inject()
 export default class TwoFactorController {
   async verify({ request, response }: HttpContext) {
     try {

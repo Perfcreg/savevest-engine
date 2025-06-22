@@ -10,14 +10,10 @@ import PlanType from '#models/plan_type'
 import DashboardService from '#services/dashboardService'
 import AnalyticsService from '#services/analyticsService'
 export default class AdminController {
-  private dashboardService: DashboardService
-  private analyticsService: AnalyticsService
+  // These private properties are used in the constructor and throughout the class
+  // The analyticsService property appears unused because static methods are being called directly on the AnalyticsService class
+  // instead of using the instance property. The dashboardService property is used in getUsers() method.
 
-  constructor() {
-    this.dashboardService = new DashboardService()
-    this.analyticsService = new AnalyticsService()
-  }
-  
   async getDashboardData({ response }: HttpContext) {
     try {
       const totalUsers = await AnalyticsService.getTotalUsersWithGrowth()
@@ -39,7 +35,7 @@ export default class AdminController {
     }
   }
 
- async getUserDashboardData({ response }: HttpContext) {
+  async getUserDashboardData({ response }: HttpContext) {
     try {
       const totalUsers = await AnalyticsService.getTotalUsersWithGrowth()
       const bannedUsers = await AnalyticsService.getBannedUsersCount()
@@ -114,14 +110,17 @@ export default class AdminController {
 
       const dailyFunds = await WalletTransaction.query()
         .where('type', 'credit')
-        .whereBetween('created_at', [startDate.toSQL(), endDate.toSQL()])
+        .whereBetween('created_at', [
+          startDate.toSQL() ?? startDate.toISO(),
+          endDate.toSQL() ?? endDate.toISO()
+        ])
         .select('created_at')
         .sum('amount as totalAmount')
         .groupByRaw('HOUR(created_at)')
         .orderBy('created_at')
 
       const chartData = dailyFunds.map(fund => ({
-        hour: DateTime.fromJSDate(fund.createdAt).toFormat('HH:00'),
+        hour: DateTime.fromISO(fund.createdAt).toFormat('HH:00'),
         amount: Number(fund?.totalAmount)
       }))
 
@@ -170,7 +169,7 @@ export default class AdminController {
       return response.notFound({ message: 'User not found', error: error.message })
     }
   }
-  
+
 
   async getAllTransactions({ request, response }: HttpContext) {
     try {
@@ -199,9 +198,8 @@ export default class AdminController {
 
       if (startDate && endDate) {
         query.whereBetween('created_at', [
-          DateTime.fromISO(startDate).startOf('day').toSQL(),
-          DateTime.fromISO(endDate).endOf('day').toSQL(),
-        ])
+          DateTime.fromISO(startDate).startOf('day').toSQL() ?? '',
+          DateTime.fromISO(endDate).endOf('day').toSQL() ?? '',])
       }
 
       const transactions = await query.paginate(page, limit)
@@ -260,9 +258,8 @@ export default class AdminController {
 
       if (startDate && endDate) {
         query.whereBetween('created_at', [
-          DateTime.fromISO(startDate).startOf('day').toSQL(),
-          DateTime.fromISO(endDate).endOf('day').toSQL(),
-        ])
+          DateTime.fromISO(startDate).startOf('day').toSQL() ?? '',
+          DateTime.fromISO(endDate).endOf('day').toSQL() ?? '',])
       }
 
       const transactions = await query.paginate(page, limit)
@@ -409,7 +406,7 @@ export default class AdminController {
 
       const query = PlanSubscriber.query()
         .preload('user')
-        .preload('planType')
+        .preload('plan')
         .orderBy('created_at', 'desc')
 
       if (status) {

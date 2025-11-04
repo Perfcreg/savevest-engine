@@ -7,7 +7,7 @@
   "deploy": {
     "port": 3333,
     "healthcheck": "/health",
-    "start_command": "npm start"
+    "start_command": "node build/bin/server.js"
   },
   "env": {
     "NODE_ENV": "production",

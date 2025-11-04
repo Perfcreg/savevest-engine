@@ -64,12 +64,12 @@ export class InterestCalculationHandler {
           }).save()
 
           await PlanTransaction.create({
-            userId: subscriber.id,
+            userId: subscriber.userId,
             amount: dailyInterest,
             planId: subscriber.planId,
             transactionType: 'INTEREST',
-            // status: 'SUCCESS',
-            reference: `#INT_${subscriber.planId}_${subscriber.userId}_${today.toLocaleString()}`
+            transactionId: `TXN_${subscriber.planId}_${subscriber.userId}_${Date.now()}`,
+            receiptId: `#INT_${subscriber.planId}_${subscriber.userId}_${today.toLocaleString()}`
           })
 
           await this.notificationService.sendPushNotification(

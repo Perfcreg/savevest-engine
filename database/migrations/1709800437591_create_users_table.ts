@@ -20,7 +20,7 @@ export default class extends BaseSchema {
       table.decimal('referral_incentives', 10, 2).defaultTo(0)
       table.string('gender').nullable()
       table.string('next_of_kin').nullable()
-      table.string('bvn', 15).nullable().unique()
+      table.boolean('bvn').defaultTo(false)
       table.string('paystack_id').nullable().unique()
       table.boolean('kyc').defaultTo(false)
       table.string('pin', 4).nullable()

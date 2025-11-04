@@ -31,7 +31,7 @@ export default class Withdrawal extends BaseModel {
   declare transferReference: string | null
 
   @column()
-  declare status: 'pending' | 'processing' | 'completed' | 'failed' | 'otp'
+  declare status: string
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>

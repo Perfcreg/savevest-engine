@@ -57,10 +57,8 @@ export default class PlanSubscriber extends BaseModel {
   @column()
   declare locked: boolean;
 
-  @column({
-    consume: (value: string) => value as 'Active' | 'Completed' | 'Cancelled',
-  })
-  declare status: 'Active' | 'Completed' | 'Cancelled';
+  @column()
+  declare status: string;
 
   @column.dateTime({ autoCreate: true })
   declare createdAt: DateTime;

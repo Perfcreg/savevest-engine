@@ -1,5 +1,5 @@
 # Multi-stage build for AdonisJS
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --frozen-lockfile
@@ -8,7 +8,7 @@ FROM base AS build
 COPY . .
 RUN yarn build
 
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 WORKDIR /app
 COPY package.json yarn.lock ./
 RUN yarn install --production --frozen-lockfile && yarn cache clean

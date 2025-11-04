@@ -56,10 +56,8 @@ export default class Plan extends BaseModel {
   @column.date()
   declare endDate: DateTime;
   
-  @column({
-    consume: (value: string) => value as 'DAILY' | 'WEEKLY' | 'MONTHLY',
-  })
-  declare interval: 'DAILY' | 'WEEKLY' | 'MONTHLY' ;
+  @column()
+  declare interval: string;
 
   @belongsTo(() => User)
   declare user: BelongsTo<typeof User>;

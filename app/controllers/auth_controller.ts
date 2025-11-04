@@ -14,10 +14,8 @@ import User from '#models/user'
 import Wallet from '#models/wallet'
 // import { stat } from 'fs'
 export default class AuthController {
-
-
   /**
-  * @register[]
+  * @register
   * @description User registration endpoint.
   * @responseBody 201 - User Created successfully
   * @responseBody 403  - User Data Exists
@@ -45,6 +43,7 @@ export default class AuthController {
         lastName: payload.lastName,
         referal: referal_code
       });
+    
 
       if (payload.referal !== '') {
         const referrer = await User.findByOrFail('referal', payload.referal);
@@ -67,7 +66,8 @@ export default class AuthController {
       } else {
         newUser.token = token
         const smsService = new SmsService();
-        await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
+        // await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
+        console.log(token)
         await newUser.save()
       }
       return response.status(201).send({ message: "User created Successfully" })
@@ -107,7 +107,6 @@ export default class AuthController {
         // Send SMS with new token
         const smsService = new SmsService()
         await smsService.sendTokenVerificationSMS(`+234${user.phone}`, token)
-
         return response.status(403).send({
           message: 'Account requires verification. A new verification code has been sent.',
           status: 'NEEDS_VERIFICATION'
@@ -167,8 +166,9 @@ export default class AuthController {
       if (!user) {
         throw new Error("User with this phone nuber not found")
       }
-      const smsService = new SmsService();
-      await smsService.sendTokenVerificationSMS(`+234${phoneNumber}`, token)
+      // const smsService = new SmsService();
+      // await smsService.sendTokenVerificationSMS(`+234${phoneNumber}`, token)
+      console.log(token)
       user.token = token
       user.save()
       return response.status(200).send({ message: "Password reset verification sent" })
@@ -199,7 +199,8 @@ export default class AuthController {
       user.paystack_id = createWallet.customer_code
       await user.related('wallet').save(wallet)
       await user.save()
-      return response.status(200).send({ message: "Phone verification suucsses" })
+      const accessToken = await User.accessTokens.create(user)
+      return response.status(200).send({ message: "Phone verification suucsses", accessToken })
     } catch (e) {
       return response.forbidden(e.message)
     }

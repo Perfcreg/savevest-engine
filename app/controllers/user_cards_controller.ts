@@ -7,11 +7,9 @@ import { createCardValidator, updateCardValidator } from '#validators/user_card'
 export default class UserCardController {
 
   /**
-   * @getCard
-   * @description get User Cards
-   * @responseBody 200 - {UserCard}
-   * @responseBody 400 - Bad request
-   * @responseBody 403 - Forbidden
+   * @getCards
+   * @description Get user's saved cards
+   * @responseBody 200 - {"userCards": [{"id": 1, "cardType": "visa", "lastFour": "1234", "expire": "12/25"}]}
    */
   async getCards({ auth, response }: HttpContext) {
     const user = await auth.authenticate()
@@ -21,11 +19,10 @@ export default class UserCardController {
 
   /**
    * @addCard
-   * @description Add a new card to Paystack and save to user_cards table.
-   * @responseBody 201 - Card added successfully
-   * @requestBody {card_number: "4084084084084081", cvv: "408", expiry_month: "10", expiry_year: "29"}
-   * @responseBody 400 - Bad request
-   * @responseBody 403 - Forbidden
+   * @description Add new payment card with verification
+   * @requestBody {"card_number": "4084084084084081", "cvv": "408", "expiry_month": "12/25"}
+   * @responseBody 201 - {"message": "Card added successfully"}
+   * @responseBody 500 - {"message": "An error occurred while processing your request"}
    */
 
   private transformCardData(data: any) {
@@ -116,10 +113,9 @@ export default class UserCardController {
 
   /**
    * @getCardTransactions
-   * @description Fetch  all card transaction on user cards table.
-   * @responseBody 200 - OK
-   * @responseBody 400 - Bad request
-   * @responseBody 403 - Forbidden
+   * @description Get user's card transaction history
+   * @responseBody 200 - {"transactions": [{"amount": 5000, "status": "success", "reference": "ref_123"}]}
+   * @responseBody 400 - {"message": "Error message"}
    */
 
   async getCardTransactions({ auth, response }: HttpContext) {
@@ -145,11 +141,12 @@ export default class UserCardController {
 
   /**
    * @updateCard
-   * @description Update an existing card for the authenticated user.
-   * @routeParam id - The ID of the card to be updated.
-   * @responseBody 200 - Card updated successfully
-   * @requestBody {card_number: "4084084084084081", cvv: "408", expiry_month: "10", expiry_year: "22"}
-   * @responseBody 400 - Bad request
+   * @description Update existing payment card
+   * @requestParams {"id": "1"}
+   * @requestBody {"card_number": "4084084084084081", "cvv": "408", "expiry_month": "12/25"}
+   * @responseBody 200 - {"message": "Card updated successfully and associated plans have been updated"}
+   * @responseBody 400 - {"message": "Unable to process the new card. Please check the card details and try again."}
+   * @responseBody 403 - {"message": "Forbidden"}
    */
   async updateCard({ auth, request, response, params }: HttpContext) {
     const user = auth.user!;
@@ -258,10 +255,10 @@ export default class UserCardController {
 
   /**
    * @deleteCard
-   * @description Delete a card for the authenticated user.
-   * @routeParam id - The ID of the card to be deleted.
-   * @responseBody 200 - Card deleted successfully
-   * @responseBody 403 - Forbidden
+   * @description Delete user's payment card
+   * @requestParams {"id": "1"}
+   * @responseBody 200 - {"message": "Card deleted successfully"}
+   * @responseBody 403 - {"message": "Forbidden"}
    */
   async deleteCard({ auth, response, params }: HttpContext) {
     const user = auth.user!;
@@ -283,6 +280,13 @@ export default class UserCardController {
     }
   }
 
+  /**
+   * @submitPin
+   * @description Submit PIN for card verification
+   * @requestBody {"pin": "1234", "reference": {"reference": "ref_123"}}
+   * @responseBody 200 - {"message": "Card updated successfully and associated plans have been updated"}
+   * @responseBody 400 - {"message": "Error message"}
+   */
   async submitPin({request, response }: HttpContext){
     const { pin, reference } = request.all()
     const paystackService = new PaystackService();

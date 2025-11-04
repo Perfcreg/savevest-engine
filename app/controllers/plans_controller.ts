@@ -22,10 +22,10 @@ export default class PlansController {
     this.notificationService = new NotificationService()
   }
   /**
-* @index
-* @description fetch all users created plans
-* @responseBody 200 - All Plans 
-*/
+   * @index
+   * @description Get all created plans
+   * @responseBody 200 - {"message": "Plan fetch successfully", "data": [{"id": 1, "name": "My Savings Plan", "amount": 5000}]}
+   */
   async index({ response }: HttpContext) {
     const userPlans = await Plan.all()
     return response.status(200).json({
@@ -35,9 +35,9 @@ export default class PlansController {
   }
 
   /**
-   * @getAllPlanType
-   * @description fetch all plan types existing inside our app
-   * @responseBody 200 - All Plan types
+   * @getPlanType
+   * @description Get all available plan types
+   * @responseBody 200 - {"message": "Plan type fetch successfully", "data": [{"id": 1, "name": "Fixed Savings", "interestRate": 10}]}
    */
   async getPlanType({ response }: HttpContext) {
     const planTypes = await PlanType.all()
@@ -49,11 +49,12 @@ export default class PlansController {
   }
 
   /**
-  * @createPlan
-  * @description User create plan.
-  * @responseBody 201 - {Plan created successfully}
-  * @requestBody { "name": "Me and my friend contribution", "description": "Lorem plsems","amount": 10000,"plan_type": "SAVING", "target_amount": 50000, "interval": "MONTHLY", "category": "Accomodation", "time": "09:00pm", "start_date": "2024-03-04","end_date": "2025-03-04"}
-  */
+   * @create
+   * @description Create new savings plan
+   * @requestBody {"name": "My Savings Plan", "description": "Monthly savings", "amount": 10000, "plan_id": 1, "target_amount": 50000, "interval": "MONTHLY", "interest": 10, "start_date": "2024-03-04", "end_date": "2025-03-04"}
+   * @responseBody 201 - {"message": "Plan created successfully"}
+   * @responseBody 403 - {"message": "No Debit card found, Create a Card to continue"}
+   */
 
   async create({ auth, request, response }: HttpContext) {
     const user = auth.user!;
@@ -77,31 +78,33 @@ export default class PlansController {
       plan.planTypeId = payload.plan_id
       const paystackPlan = await this.paystackService.createPlan(
         payload.name,
+      
         payload.description,
         payload.amount * 100, // Paystack amount is in kobo
         payload.interval.toLowerCase()
       );
       plan.planCode = paystackPlan.plan_code;
 
-      // Generate a reference code
-      const access_code = await UserCard.findBy('user_id', user.id)
-
-      if (access_code === null) {
-        return response.forbidden({
-          message: 'No Debit card found, Create a Card to continue',
-        });
-      }
-      const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code?.token);
       const data = await plan.save();
-      // Create and save to Savings table
+      // Check if user has a card for automatic subscription
+      const access_code = await UserCard.findBy('user_id', user.id)
+      
+      // Create plan subscriber record
       const userSavings = new PlanSubscriber();
       userSavings.userId = user.id;
       userSavings.planId = data.id;
-      userSavings.status = 'Active';
-      userSavings.subscriptionCode = create_subscription.subscription_code;
-      userSavings.emailToken = create_subscription.email_token
+      userSavings.status = access_code ? 'Active' : 'Pending';
       userSavings.startDate = DateTime.fromISO(payload.start_date.toISOString());
       userSavings.endDate = DateTime.fromISO(payload.end_date.toISOString());
+      userSavings.subscriptionCode = `SAV-${referenceCode}-manual`
+      userSavings.emailToken = `SAV-${referenceCode}-manual`
+      
+      // Only create subscription if user has a card
+      if (access_code) {
+        const create_subscription = await this.paystackService.createSubscription(user.email, plan.planCode, access_code.token);
+        userSavings.subscriptionCode = create_subscription.subscription_code;
+        userSavings.emailToken = create_subscription.email_token;
+      }
 
       await userSavings.save();
 
@@ -114,12 +117,11 @@ export default class PlansController {
   }
 
   /**
-    * @getUserPlans
-    * @description Get all plans of a particular user.
-    * @responseBody 200 - { User's plans}
-    * @responseBody 404 - { User not found}
-    * @requestParams { "id": "1" }
-    */
+   * @getUsersPlan
+   * @description Get all user's plan subscriptions
+   * @responseBody 200 - {"plans": [{"id": 1, "plan": {"name": "My Plan"}, "currentAmount": 25000, "status": "Active"}]}
+   * @responseBody 403 - {"message": "Error message"}
+   */
   async getUsersPlan({ auth, response }: HttpContext) {
     try {
       const user = await auth.user!
@@ -138,10 +140,10 @@ export default class PlansController {
 
   /**
    * @getPlan
-   * @description Get a particular plan by ID.
-   * @responseBody 200 - {Plan details}
-   * @responseBody 404 - {Plan not found}
-   * @requestParams { "plan_code": "123232332" }
+   * @description Get plan details by plan code
+   * @requestParams {"plan_code": "pln_123456789"}
+   * @responseBody 200 - {"plan": {"id": 1, "name": "My Plan", "amount": 5000, "planCode": "pln_123456789"}}
+   * @responseBody 500 - {"message": "An error occurred while fetching the plan"}
    */
   async getPlan({ params, response }: HttpContext) {
     // 
@@ -162,10 +164,12 @@ export default class PlansController {
 
   /**
    * @joinPlan
-   * @description - User subscribe to another user's plan 
-   * @requestParams { "plan_code": "pln_112122323" }
-   * @responseBody 200 - {Plan Subscribed Successfully}
-   * @responseBody 500 - {User not found}
+   * @description Subscribe to an existing plan
+   * @requestParams {"plan_code": "pln_123456789"}
+   * @responseBody 200 - {"message": "Plan Subscribed Successfully"}
+   * @responseBody 404 - {"message": "Plan not found"}
+   * @responseBody 403 - {"message": "No Debit card found"}
+   * @responseBody 500 - {"error": "Error message"}
    */
   async joinPlan({ auth, response, params }: HttpContext) {
     const user = auth.user!;
@@ -210,10 +214,10 @@ export default class PlansController {
 
   /**
    * @getUserPlanTransactions
-   * @description - Get Plan Transactions
-   * @requestParams {"plan_code": "pln_13123133"}
-   * @responseBody 200 - { "message": "Plan Transactions Fetched Successfully", "data": [] }
-   * @responseBody 500 - { "Error Fetching Plan Transactions" }
+   * @description Get plan transaction history
+   * @requestParams {"plan_code": "sub_123456789"}
+   * @responseBody 200 - {"message": "Plan Transaction Fetched Successfully", "data": [{"amount": 5000, "status": "success"}]}
+   * @responseBody 500 - {"error": "Error message"}
    */
   async getUserPlanTransactions({ response, params }: HttpContext) {
     // const plan = await PlanSubscriber.findByOrFail('subscription_code', params.plan_code);
@@ -229,12 +233,13 @@ export default class PlansController {
   }
 
   /**
-     * @cancelPlan
-     * @description - User subscribe to another user's plan 
-     * @requestParams { "plan_code": "pln_112122323" }
-     * @responseBody 200 - Plan unsubscribed Successfully
-     * @responseBody 500 - User not found
-     */
+   * @cancelSubscription
+   * @description Cancel plan subscription with password verification
+   * @requestParams {"id": "1"}
+   * @requestBody {"password": "password123"}
+   * @responseBody 200 - {"message": "Plan unsubscribed successfully"}
+   * @responseBody 403 - {"message": "This savings plan is locked and cannot be broken"}
+   */
   async cancelSubscription({ auth, params, request, response }: HttpContext) {
     try {
       const user = auth.user!;
@@ -300,11 +305,11 @@ export default class PlansController {
   }
 
   /**
-   * @getPlanSubscriber
-   * @description - Get Plan Subscriber
+   * @getPlanSubscribers
+   * @description Get plan subscribers and transactions
    * @requestParams {"plan_id": "1"}
-   * @responseBody 200 - { "message": "Plan Subscribers Fetched Successfully", "data": [] }
-   * @responseBody 500 - { "Error Fetching Plan Subscribers" }
+   * @responseBody 200 - {"message": "Plan Transaction Fetched Successfully", "data": {"planSubscribers": [], "planTransactions": []}}
+   * @responseBody 500 - {"error": "Error message"}
    */
   async getPlanSubscribers({ response, params }: HttpContext) {
     try {
@@ -326,13 +331,13 @@ export default class PlansController {
 
 
   /**
- * @inviteMember
- * @description Invite a member to join a savings plan.
- * @responseBody 200 - Invitation sent successfully
- * @requestBody { username: "example_user" }
- * @requestParams { "id": "1" }
- * @responseBody 403 - Forbidden
- */
+   * @inviteMember
+   * @description Invite user to join savings plan
+   * @requestParams {"id": "1"}
+   * @requestBody {"username": "johndoe"}
+   * @responseBody 200 - {"message": "Member invited successfully"}
+   * @responseBody 403 - {"message": "Error message"}
+   */
   async inviteMember({ auth, request, params, response }: HttpContext) {
     const user = auth.user!;
     const { username } = request.only(['username']);
@@ -362,10 +367,11 @@ export default class PlansController {
 
   /**
    * @lockSavings
-   * @description Lock a savings plan.
-   * @responseBody 200 - Savings locked successfully
-   * @requestParams { "id": "1", "password", "*********" }
-   * @responseBody 403 - Forbidden
+   * @description Lock savings plan with password verification
+   * @requestParams {"id": "1"}
+   * @requestBody {"password": "password123"}
+   * @responseBody 200 - {"message": "Plan Savings locked successfully"}
+   * @responseBody 403 - {"message": "Invalid credentials"}
    */
   async lockSavings({ auth, params, request, response }: HttpContext) {
     try {
@@ -390,10 +396,10 @@ export default class PlansController {
 
   /**
    * @breakSavings
-   * @description Break a savings plan before the withdrawal date.
-   * @responseBody 200 - Savings broken successfully
-   * @requestParams { "id": "1" }
-   * @responseBody 403 - Forbidden
+   * @description Break savings plan with penalty
+   * @requestParams {"id": "1"}
+   * @responseBody 200 - {"message": "Plan Savings Breaked successfully"}
+   * @responseBody 403 - {"message": "This savings plan is locked and cannot be broken"}
    */
   async breakSavings({ auth, params, response }: HttpContext) {
     const user = auth.user!;
@@ -436,10 +442,10 @@ export default class PlansController {
 
   /**
    * @getCustomerTransactions
-   * @description Get all transactions for a specific savings plan.
-   * @responseBody 200 - Success
-   * @requestParams { "id": "1" }
-   * @responseBody 403 - Forbidden
+   * @description Get transactions for specific plan subscription
+   * @requestParams {"id": "1"}
+   * @responseBody 200 - [{"id": 1, "amount": 5000, "transactionType": "DEPOSIT"}]
+   * @responseBody 403 - {"message": "You are not authorized to view these transactions"}
    */
   async getCustomerTransactions({ auth, params, response }: HttpContext) {
     const user = auth.user!;
@@ -458,56 +464,38 @@ export default class PlansController {
 
   /**
    * @fundPlanFromWallet
-   * @description Move funds from wallet to a savings plan (no Paystack/card required)
-   * @requestBody { plan_id: number, amount: number }
-   * @responseBody 200 - Funds added to plan successfully
-   * @responseBody 400 - Insufficient funds or invalid request
+   * @description Transfer funds from wallet to savings plan
+   * @requestBody {"plan_id": 1, "amount": 10000}
+   * @responseBody 200 - {"message": "Funds transferred to plan successfully", "walletTransaction": {}, "planTransaction": {}}
+   * @responseBody 400 - {"message": "Invalid plan or amount"}
+   * @responseBody 500 - {"message": "Error transferring funds to plan"}
    */
   async fundPlanFromWallet({ auth, request, response }: HttpContext) {
     try {
       const user = auth.user!;
       const { plan_id, amount } = request.only(['plan_id', 'amount']);
+      
       if (!plan_id || !amount || isNaN(amount) || amount <= 0) {
         return response.badRequest({ message: 'Invalid plan or amount' });
       }
-      // Find wallet and plan
-      const wallet = await Wallet.findByOrFail('user_id', user.id);
-      if (wallet.amount < Number(amount)) {
-        return response.badRequest({ message: 'Insufficient wallet balance' });
+
+      const WalletService = (await import('#services/walletService')).default
+      const result = await WalletService.transferWalletToPlan(user.id, plan_id, Number(amount))
+
+      if (!result.success) {
+        return response.badRequest({ message: result.message });
       }
-      const planSub = await PlanSubscriber.query().where('user_id', user.id).where('plan_id', plan_id).first();
-      if (!planSub) {
-        return response.badRequest({ message: 'You are not subscribed to this plan' });
-      }
-      if (planSub.status !== 'Active') {
-        return response.badRequest({ message: 'Plan is not active' });
-      }
-      // Deduct from wallet
-      wallet.amount -= Number(amount);
-      await wallet.save();
-      // Add to plan
-      planSub.currentAmount = (planSub.currentAmount || 0) + Number(amount);
-      await planSub.save();
-      // Record wallet transaction
-      await WalletTransaction.create({
-        userId: user.id,
-        amount: Number(amount),
-        transactionType: 'WITHDRAWAL',
-        reference: `PLAN_${plan_id}`,
-        walletId: wallet.id
+
+      return response.ok({ 
+        message: 'Funds transferred to plan successfully',
+        walletTransaction: result.walletTransaction,
+        planTransaction: result.planTransaction
       });
-      // Record plan transaction
-      await PlanTransaction.create({
-        userId: user.id,
-        planId: plan_id,
-        amount: Number(amount),
-        transactionType: 'DEPOSIT',
-        receiptId: `WALLET_${wallet.id}`,
-        transactionId: `PLAN_${plan_id}_${Date.now()}`
-      });
-      return response.ok({ message: 'Funds added to plan successfully' });
     } catch (error) {
-      return response.internalServerError({ message: 'Error funding plan from wallet', error: error.message });
+      return response.internalServerError({ 
+        message: 'Error transferring funds to plan', 
+        error: error.message 
+      });
     }
   }
 

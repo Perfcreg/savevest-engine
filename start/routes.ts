@@ -53,18 +53,21 @@ router
   router
   .group(() => {
     // User Management Routes
-    router.get('/users/:page/:limit', [AdminController, 'getUsers'])    
     router.post('/users', [AdminController, 'createUser'])
+    router.get('/users/:userId/actions', [AdminController, 'getUserActions'])
+    router.get('/users/:userId/transactions', [AdminController, 'getUserTransactions'])
+    router.get('/users/:userId/savings', [AdminController, 'getUserSavings'])
+    router.get('/users/:userId/withdrawals', [AdminController, 'getUserWithdrawals'])
+    router.get('/users/:userId/stats', [AdminController, 'getUserStats'])
     router.get('/users/:userId', [AdminController, 'getSingleUser'])
     router.put('/users/:userId/ban', [AdminController, 'banUser'])
-    router.get('/users/:userId/stats', [AdminController, 'getUserStats'])
+    router.get('/users/:page/:limit', [AdminController, 'getUsers'])
 
     // Analytics Routes
-    router.get('/analytics/daily', [AdminController, 'getDailyAnalytics'])
+    router.get('/analytics/daily', [AdminController, 'getWalletDailyAnalytics'])
     router.get('/analytics/monthly', [AdminController, 'getMonthlyAnalytics'])
     router.get('/dashboard-data', [AdminController, 'getDashboardData'])
     router.get('/user-dashboard-data', [AdminController, 'getUserDashboardData'])
-
 
     // Transaction Routes
     router.get('/transactions', [AdminController, 'getAllTransactions'])
@@ -77,11 +80,19 @@ router
     router.get('/withdrawals', [AdminController, 'checkWithdrawals'])
     router.get('/withdrawals/all', [AdminController, 'getAllWithdrawals'])
     router.put('/withdrawals/:withdrawalId/approve', [AdminController, 'approveWithdrawal'])
+    router.put('/withdrawals/:withdrawalId/reject', [AdminController, 'rejectWithdrawal'])
 
     // Plan Management Routes
     router.get('/plan-subscriptions', [AdminController, 'getPlanSubscriptions'])
     router.post('/plan-types', [AdminController, 'createPlanType'])
     router.put('/plan-types/:planTypeId', [AdminController, 'updatePlanType'])
+    router.delete('/plan-types/:planTypeId', [AdminController, 'deletePlanType'])
+
+    // Enhanced User Management Routes
+    router.put('/users/:userId/profile', [AdminController, 'updateUserProfile'])
+        
+    // System Management
+    router.get('/system/stats', [AdminController, 'getSystemStats'])
   })
   .prefix('/api/admin')
   .use(middleware.auth())
@@ -116,8 +127,8 @@ router.group(() => {
   router.put('kin', [UsersController, 'updateKin']);
   router.put('push-token', [NotificationController, 'updateDeviceId']);
   router.put('create-dva', [WalletController, 'createDVA']);
-  router.post('verify-2fa', '#controllers/two_factor_controller.verify')
-  router.put('toggle-2fa', '#controllers/two_factor_controller.toggle')
+  router.post('verify-2fa', [() => import('#controllers/two_factor_controller'), 'verify'])
+  router.put('toggle-2fa', [() => import('#controllers/two_factor_controller'), 'toggle'])
    
 }).prefix('/api/user')
   .use(apiThrottle)
@@ -192,6 +203,28 @@ router
   .use(apiThrottle)
   .use(middleware.auth())
 
+
+// Wallet reconciliation routes
+router
+  .group(() => {
+    router.get('/check-wallet', [() => import('#controllers/wallet_reconciliation_controller'), 'checkWalletBalance'])
+    router.get('/check-plan/:planId', [() => import('#controllers/wallet_reconciliation_controller'), 'checkPlanBalance'])
+    router.post('/reconcile-wallet', [() => import('#controllers/wallet_reconciliation_controller'), 'reconcileWallet'])
+    router.get('/balances', [() => import('#controllers/wallet_reconciliation_controller'), 'getUserBalances'])
+  })
+  .prefix('/api/user/reconciliation')
+  .use(middleware.auth())
+  .use(apiThrottle)
+
+// Admin reconciliation routes
+router
+  .group(() => {
+    router.get('/check-all-balances', [() => import('#controllers/wallet_reconciliation_controller'), 'checkAllBalances'])
+  })
+  .prefix('/api/admin/reconciliation')
+  .use(middleware.auth())
+  .use(middleware.isAdmin())
+  .use(apiThrottle)
 
 router.get("/swagger", async () => {
   return AutoSwagger.default.docs(router.toJSON(), swagger);

@@ -9,9 +9,11 @@ export default class extends BaseSchema {
       table.integer('plan_id').unsigned().references('plans.id')
       table.integer('user_id').unsigned().references('users.id')
       table.float('amount').notNullable()
-      table.string('receipt_id').notNullable()
+      table.string('receipt_id').notNullable().unique() // Make unique to prevent duplicates
       table.string('transaction_id').notNullable()
       table.string('transaction_type').notNullable()
+      table.json('metadata').nullable() // Store additional data
+      table.string('status').defaultTo('completed')
       table.timestamp('created_at')
       table.timestamp('updated_at')
     })

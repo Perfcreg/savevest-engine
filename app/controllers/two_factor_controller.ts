@@ -3,6 +3,14 @@ import User from '#models/user'
 import { verifyTwoFactorValidator } from '#validators/two_factor'
 
 export default class TwoFactorController {
+  /**
+   * @verify
+   * @description Verify 2FA PIN
+   * @requestBody {"pin": "1234", "userId": 1}
+   * @responseBody 200 - {"statusCode": 200, "status": "success", "message": "2FA verification successful"}
+   * @responseBody 401 - {"statusCode": 401, "status": "error", "message": "Invalid PIN"}
+   * @responseBody 500 - {"statusCode": 500, "status": "error", "message": "Failed to verify PIN"}
+   */
   async verify({ request, response }: HttpContext) {
     try {
       const data = await request.validateUsing(verifyTwoFactorValidator)
@@ -32,6 +40,14 @@ export default class TwoFactorController {
     }
   }
 
+  /**
+   * @toggle
+   * @description Enable or disable 2FA for user
+   * @requestBody {"enabled": true}
+   * @responseBody 200 - {"statusCode": 200, "status": "success", "message": "2FA has been enabled"}
+   * @responseBody 400 - {"statusCode": 400, "status": "error", "message": "PIN is not set"}
+   * @responseBody 500 - {"statusCode": 500, "status": "error", "message": "Failed to update 2FA settings"}
+   */
   async toggle({ request, response, auth }: HttpContext) {
     try {
       const user = auth.user!

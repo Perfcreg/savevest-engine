@@ -7,9 +7,12 @@ import PaystackService from '#services/paystackService';
 
 export default class UserBanksController {
 
-  // get user banks
-
-
+  /**
+   * @get
+   * @description Get user's saved bank accounts
+   * @responseBody 200 - {"message": "Bank account found", "data": [{"id": 1, "bankName": "GTBank", "accountNumber": "1234567890"}]}
+   * @responseBody 400 - {"message": "Error message"}
+   */
   async get({ auth, response }: HttpContext) {
     try {
       const user = await auth.authenticate()
@@ -23,13 +26,12 @@ export default class UserBanksController {
     }
   }
   /**
- * @addBank
- * @description Add a new bank account to Paystack and save to user_banks table.
- * @responseBody 201 - Bank account added successfully
- * @requestBody {bank_code: "044", account_number: "1234567890"}
- * @responseBody 400 - Bad request
- * @responseBody 403 - Forbidden
- */
+   * @addBank
+   * @description Add new bank account for withdrawals
+   * @requestBody {"bank_code": "044", "account_number": "1234567890", "bank_name": "Access Bank"}
+   * @responseBody 201 - {"message": "Bank account added successfully", "data": {"id": 1, "bankName": "Access Bank"}}
+   * @responseBody 400 - {"message": "Bank already exists"}
+   */
   async addBank({ auth, request, response }: HttpContext) {
     const user = await auth.authenticate()
     const { bank_code, account_number, bank_name } = await request.validateUsing(bankValidator);
@@ -71,12 +73,12 @@ export default class UserBanksController {
 
   /**
    * @updateBank
-   * @description Update an existing bank account for the authenticated user.
-   * @routeParam id - The ID of the bank account to be updated.
-   * @responseBody 200 - Bank account updated successfully
-   * @requestBody {bank_code: "044", account_number: "1234567890"}
-   * @responseBody 400 - Bad request
-   * @responseBody 403 - Forbidden
+   * @description Update existing bank account
+   * @requestParams {"id": "1"}
+   * @requestBody {"bank_code": "044", "account_number": "1234567890", "bank_name": "Access Bank"}
+   * @responseBody 200 - {"message": "Bank account updated successfully", "data": {}}
+   * @responseBody 400 - {"message": "Error message"}
+   * @responseBody 403 - {"message": "Forbidden"}
    */
   async updateBank({ auth, request, response, params }: HttpContext) {
     const user = auth.user!;
@@ -103,8 +105,13 @@ export default class UserBanksController {
     }
   }
 
-  // write the controller that handle bank acccount deletion 
-
+  /**
+   * @deleteBank
+   * @description Delete user's bank account
+   * @requestParams {"id": "1"}
+   * @responseBody 200 - {"message": "Bank account deleted"}
+   * @responseBody 400 - {"message": "Error message"}
+   */
   async deleteBank({ response, params }: HttpContext) {
     try {
       const bankId = params.id

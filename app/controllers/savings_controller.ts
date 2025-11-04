@@ -7,13 +7,13 @@ import IncentiveService from '#services/incentiveService';
 
 
 export default class SavingsController {
-     /**
-   * @depositToSavings
-   * @description Initiate a payment through Paystack for an existing savings.
-   * @responseBody 201 - Deposit initiated successfully
-   * @requestBody { amount: 1000}
-   * @requestParams { "id": "1" }
-   * @responseBody 403 - Forbidden
+  /**
+   * @deposit
+   * @description Deposit to savings plan via Paystack
+   * @requestParams {"id": "1"}
+   * @requestBody {"amount": 10000}
+   * @responseBody 201 - {"message": "Deposit initiated successfully", "data": {"id": 1, "amount": 10000}}
+   * @responseBody 403 - {"message": "Error message"}
    */
   async deposit({ auth, request, params, response }: HttpContext) {
     const user = auth.user!;
@@ -57,10 +57,10 @@ export default class SavingsController {
   }
 
   /**
-   * @getAllSavingsTransactions
-   * @description Get all savings transactions for an authenticated user.
-   * @responseBody 200 - Success
-   * @responseBody 403 - Forbidden
+   * @index
+   * @description Get all user's savings transactions
+   * @responseBody 200 - [{"id": 1, "amount": 5000, "transactionType": "DEPOSIT", "createdAt": "2024-01-01"}]
+   * @responseBody 403 - {"message": "Error message"}
    */
   async index({ auth, response }: HttpContext) {
     const user = auth.user!;

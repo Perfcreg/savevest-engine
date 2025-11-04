@@ -26,10 +26,16 @@ export default class WalletTransaction extends BaseModel {
   declare amount: number;
 
   @column()
-  declare transactionType: 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER' | 'TRANSFER_REVERSAL' | 'INTEREST';
+  declare transactionType: string;
 
   @column()
   declare reference: string;
+
+  @column()
+  declare metadata: string | null;
+
+  @column()
+  declare status: string;
 
   @column.dateTime({ autoCreate: true })
   declare transactionDate: DateTime;
@@ -39,5 +45,4 @@ export default class WalletTransaction extends BaseModel {
 
   @column.dateTime({ autoCreate: true, autoUpdate: true })
   declare updatedAt: DateTime
-  totalAmount: any;
 }

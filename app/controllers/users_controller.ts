@@ -8,7 +8,14 @@ import app from '@adonisjs/core/services/app'
 import fs, { ReadStream } from 'fs'
 import IncentiveService from '#services/incentiveService'
 import PaystackService from '#services/paystackService'
+import UserBank from '#models/user_bank'
 export default class UsersController {
+    /**
+     * @getUserIncentives
+     * @description Get user referral incentives
+     * @responseBody 200 - {"message": "User incentives retrieved successfully", "data": {"totalIncentives": 150}}
+     * @responseBody 500 - {"message": "Error retrieving user incentives", "error": "Error message"}
+     */
     async getUserIncentives({ auth, response }: HttpContext) {
         try {
             const user = auth.user!
@@ -28,9 +35,9 @@ export default class UsersController {
 
     /**
      * @get
-     * @description Get logged in user.
-     * @responseBody 200 - Verification successful
-     * @responseBody 401 - User not logged in
+     * @description Get logged in user profile
+     * @responseBody 200 - {"user": {"id": 1, "firstName": "John", "lastName": "Doe", "email": "john@example.com"}}
+     * @responseBody 401 - {"message": "Authentication required"}
      */
     async get({ auth, response }: HttpContext) {
         const user = await auth.user!
@@ -40,11 +47,11 @@ export default class UsersController {
 
     /**
      * @updateProfile
-     * @description User update Profile endpoint.
-     * @requestBody {"gender": "MALE", "username": "johndoe","fullName": "John Doe", "dateOfBirth": "1990-01-01"}
+     * @description Update user profile information
+     * @requestBody {"gender": "male", "username": "johndoe", "firstName": "John", "lastName": "Doe", "dateOfBirth": "1990-01-01"}
      * @responseBody 200 - {"message": "Profile updated successfully"}
      * @responseBody 422 - {"errors": ["Validation error message"]}
-     * @responseBody 500 - {"error": "Something went wrong" }
+     * @responseBody 500 - {"error": "Something went wrong"}
      */
     async updateProfile({ auth, response, request }: HttpContext) {
         try {
@@ -72,13 +79,13 @@ export default class UsersController {
     }
 
     /**
-      * @updatePassword
-      * @description User change password endpoint.
-      * @responseBody 200 - {"message": "Password updated successfully"}
-      * @responseBody 400 - {"error": "Incorrect old password"}
-      * @responseBody 422 - {"errors": "Validation error message"}
-      * @responseBody 500 - {"error": "Something went wrong" }
-      * @requestBody {"oldPassword": "oldpassword123","newPassword": "newpassword123","confirmPassword": "newpassword123"}
+     * @updatePassword
+     * @description Change user password
+     * @requestBody {"oldPassword": "oldpassword123", "newPassword": "newpassword123"}
+     * @responseBody 200 - {"message": "Password changed successfully"}
+     * @responseBody 400 - {"error": "Incorrect old password"}
+     * @responseBody 422 - {"errors": ["Validation error message"]}
+     * @responseBody 500 - {"error": "Something went wrong"}
      */
     async updatePassword({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(updatePasswordValidator)
@@ -110,12 +117,13 @@ export default class UsersController {
 
 
 
-    /** 
-      * @updatePhoneNumber
-      * @description User Updated phone number.
-      * @responseBody 204 - User phone successfully
-      * @requestBody {"phone_number": "080341288211"}
-      */
+    /**
+     * @updatePhoneNumber
+     * @description Update user phone number with SMS verification
+     * @requestBody {"phone_number": "08034567890"}
+     * @responseBody 204 - {"message": "User phone number changed successfully"}
+     * @responseBody 403 - {"message": "Error message"}
+     */
     async updatePhoneNumber({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(updatePhoneNumberValidator)
         const token = GenerateTokenHelper.generateToken(4); // Generate a 4-character token
@@ -133,12 +141,14 @@ export default class UsersController {
     }
 
 
-    /** 
- * @createPin
- * @description User Create pin code.
- * @responseBody 204 - User pin successfully
- * @requestBody {"pin": "1234", "confirm_pin": " 1234"}
- */
+    /**
+     * @createPin
+     * @description Create user transaction PIN
+     * @requestBody {"pin": "1234", "confirm_pin": "1234"}
+     * @responseBody 200 - {"message": "User pin Added successfully"}
+     * @responseBody 400 - {"message": "You have already created a pin"}
+     * @responseBody 403 - {"message": "Error message"}
+     */
     async createPin({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(createPinValidator)
         try {
@@ -172,12 +182,14 @@ export default class UsersController {
         }
     }
 
-    /** 
-* @VerifyPin
-* @description User Verify pin code.
-* @responseBody 200 - User Verify PIN successfully
-* @requestBody {"pin": "1234"}
-*/
+    /**
+     * @verifyPin
+     * @description Verify user transaction PIN
+     * @requestBody {"pin": "1234"}
+     * @responseBody 200 - {"message": "User pin verify"}
+     * @responseBody 400 - {"message": "You have not created a pin"}
+     * @responseBody 403 - {"message": "Invalid Pin"}
+     */
 
     async verifyPin({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(verifyPinValidator)
@@ -198,12 +210,14 @@ export default class UsersController {
         }
     }
 
-    /** 
-  * @updatePin
-  * @description User Updated pin number.
-  * @responseBody 200 - User pin successfully
-  * @requestBody {"pin": "1234"}
-  */
+    /**
+     * @updatePin
+     * @description Update user transaction PIN
+     * @requestBody {"old_pin": "1234", "new_pin": "5678"}
+     * @responseBody 200 - {"message": "User pin changed successfully"}
+     * @responseBody 400 - {"message": "Invalid Pin Combination, choose something different"}
+     * @responseBody 403 - {"message": "Error message"}
+     */
     async updatePin({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(updatePinValidator)
         try {
@@ -241,12 +255,13 @@ export default class UsersController {
         }
     }
 
-    /** 
-  * @updateKin
-  * @description User Updated next of kins
-  * @responseBody 204 - User kins successfully updated
-  * @requestBody {"next_of_kin": "Ajayi Onalaja"}
-  */
+    /**
+     * @updateKin
+     * @description Update user next of kin information
+     * @requestBody {"kin": "John Doe"}
+     * @responseBody 200 - {"message": "User next of kin changed successfully"}
+     * @responseBody 403 - {"message": "Error message"}
+     */
     async updateKin({ auth, response, request }: HttpContext) {
         const { ...payload } = await request.validateUsing(updateKinValidator)
         try {
@@ -260,12 +275,13 @@ export default class UsersController {
     }
 
 
-    /** 
-* @update2fa
-* @description User Updated two factor authentication
-* @responseBody 200 - User 2fa updated successfully 
-* @requestBody {"2fa": true}
-*/
+    /**
+     * @update2fa
+     * @description Update two-factor authentication setting
+     * @requestBody {"2fa": true}
+     * @responseBody 204 - {"message": "User 2FA updated successfully"}
+     * @responseBody 403 - {"message": "Error message"}
+     */
     async update2fa({ auth, response, request }: HttpContext) {
         try {
             let user = await auth.user!
@@ -280,13 +296,14 @@ export default class UsersController {
 
 
     /**
-   * @uploadPhoto
-   * @description Handle photo upload
-   * @requestFormDataBody {"picture":{"type":"string","format":"binary"}} // Expects a valid OpenAPI 3.x JSON
-   * @responseBody 200 - Photo uploaded successfully
-   * @responseBody 400 - Validation error
-   * @responseBody 500 - Error uploading photo
-   */
+     * @uploadPhoto
+     * @description Upload user profile photo
+     * @requestFormDataBody {"photo": {"type": "string", "format": "binary"}}
+     * @responseBody 200 - {"message": "Photo uploaded successfully", "url": "https://s3.amazonaws.com/photo.jpg"}
+     * @responseBody 400 - {"message": "Invalid file type. Only images are allowed."}
+     * @responseBody 401 - {"message": "Authentication failed"}
+     * @responseBody 500 - {"message": "Error uploading photo"}
+     */
     async uploadPhoto({ auth, request, response }: HttpContext) {
 
         const payload = await request.validateUsing(photoUploadValidator)
@@ -347,28 +364,30 @@ export default class UsersController {
         }
     }
 
-    /** 
-* @updateKyc
-* @description User Add Kyc
-* @responseBody 200 - User KYC Verification Successful
-* @requestBody {"bvn": "12323237847"}
-*/
+    /**
+     * @updateKyc
+     * @description Submit KYC verification with BVN
+     * @requestBody {"bvn": "12345678901"}
+     * @responseBody 200 - {"message": "KYC Verification submitted, Paystack system will handle it"}
+     * @responseBody 400 - {"message": "KYC Verification Failed"}
+     */
     async updateKyc({ auth, response, request }: HttpContext) {
         try {
             const user = await auth.authenticate();
             const payload = await request.validateUsing(bvnValidator)
-
             const paystack = new PaystackService()
             const verifyUser = await paystack.validateCustomer({
-                first_name: user.firstName,
-                last_name: user.lastName,
-                type: 'bvn',
+                id: user.paystack_id,
                 country: 'NG',
+                type: 'bvn',
                 value: payload.bvn,
-                id: user.paystack_id
+                first_name: user.firstName,
+                last_name: user.lastName
             })
+
+           console.log(user.paystack_id, verifyUser)
             return response.status(200).send({
-                message: 'KYC Verification submitted, Paystack system will handle it'
+                message: 'KYC Verification submitted, Our system will send a notification shortly'
             })
         } catch (error) {
             console.log(error)

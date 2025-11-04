@@ -10,7 +10,9 @@ export default class extends BaseSchema {
       table.integer('user_id').unsigned().references('users.id').onDelete('CASCADE');
       table.decimal('amount', 15, 2).notNullable();
       table.enum('transaction_type', ['DEPOSIT','WITHDRAWAL','TRANSFER','TRANSFER_REVERSAL','INTEREST']).notNullable();
-      table.string('reference').notNullable();
+      table.string('reference').notNullable().unique(); // Make reference unique to prevent duplicates
+      table.json('metadata').nullable(); // Store additional transaction data
+      table.string('status').defaultTo('completed'); // Track transaction status
       table.timestamp('transaction_date').defaultTo(this.now());
       table.timestamp('created_at')
       table.timestamp('updated_at')

@@ -314,7 +314,8 @@ class PaystackService {
     async validateCustomer(data: Object) {
         try {
             const response = await this.paystack.customer.validate(data)
-            return response.data
+            console.log(response)
+            return response
         } catch (error) {
             throw new Error(`Error validating customer: ${error.message}`)
         }

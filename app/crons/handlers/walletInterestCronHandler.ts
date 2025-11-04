@@ -22,7 +22,8 @@ export  class WalletInterestCronHandler {
                 transaction.amount = dailyInterest;
                 transaction.transactionType = 'INTEREST';
                 transaction.reference = `WalletInt_${wallet.id + token}`;
-                transaction.userId = wallet.user_id
+                transaction.userId = wallet.user_id;
+                transaction.status = 'COMPLETED';
                 await transaction.save(); // Save transaction to history
             });
         } catch (error) {
@@ -50,50 +51,61 @@ export  class SavingExpireCronHandler {
             })
 
             // calculate interest of each plan
-            plansEndingToday.forEach(async (plan) => {
-                const token = GenerateTokenHelper.generateAlphanumeric(10); // Generate a 10-character token
-                // calculate total amount accumulate on the plan let say 15%
-                await plan.load('plan')
-                await plan.load('user')
-                const totalInterest = (Number(plan.currentAmount) / 100 ) * plan.plan.interestRate
-                const newPlanBalance = (Number(plan.currentAmount) + totalInterest); // Update balance
+            for (const plan of plansEndingToday) {
+                try {
+                    const token = GenerateTokenHelper.generateAlphanumeric(10); // Generate a 10-character token
+                    // calculate total amount accumulate on the plan let say 15%
+                    await plan.load('plan')
+                    await plan.load('user')
+                    const totalInterest = (Number(plan.currentAmount) / 100 ) * plan.plan.interestRate
+                    const newPlanBalance = (Number(plan.currentAmount) + totalInterest); // Update balance
 
-                await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
-           
-                await plan.merge({
-                    currentAmount: newPlanBalance,
-                     status: 'Completed',
-                }).save();
+                    // Try to cancel subscription, but don't fail if it's already cancelled
+                    try {
+                        await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
+                    } catch (paystackError) {
+                        logger.warn(`Failed to cancel subscription for plan ${plan.id}: ${paystackError.message}`)
+                    }
+               
+                    await plan.merge({
+                        currentAmount: newPlanBalance,
+                         status: 'Completed',
+                    }).save();
 
-                await PlanTransaction.create({
-                    planId: plan.planId,
-                    amount: newPlanBalance,
-                    transactionType: 'WITHDRAWAL',
-                    reference: `PlanInt_${plan.planId + token}`,
-                    userId: plan.userId
-                })
-                const wallet = await Wallet.query().where('user_id', plan.userId).first()
-                const newBalance = (Number(wallet?.amount) + newPlanBalance);
+                    await PlanTransaction.create({
+                        planId: plan.planId,
+                        amount: newPlanBalance,
+                        transactionType: 'WITHDRAWAL',
+                        receiptId: `PlanInt_${plan.planId + token}`,
+                        userId: plan.userId,
+                        status: 'COMPLETED'
+                    })
+                    const wallet = await Wallet.query().where('user_id', plan.userId).first()
+                    const newBalance = (Number(wallet?.amount) + newPlanBalance);
 
-                await wallet?.merge({ amount: newBalance }).save();
-                
-                await WalletTransaction.create({
-                    walletId: wallet?.id,
-                    amount: newPlanBalance,
-                    transactionType: 'DEPOSIT',
-                    reference: `PlanInt_${wallet?.id + token}`,
-                    userId: plan.userId,
-                })
+                    await wallet?.merge({ amount: newBalance }).save();
+                    
+                    await WalletTransaction.create({
+                        walletId: wallet?.id,
+                        amount: newPlanBalance,
+                        transactionType: 'DEPOSIT',
+                        reference: `PlanInt_${wallet?.id + token}`,
+                        userId: plan.userId,
+                        status: 'COMPLETED'
+                    })
 
-                await this.notificationService.sendPushNotification(
-                    plan.user,
-                    '🎉 Plan completed Successfully',
-                    `Your target goal for the ${plan.plan.name} plan has been achieved! 
-                    Congratulations on reaching your savings goal! your total savings and 
-                    interest has been deposited to your wallet 🎉`,
-                    { type: 'subscription_created' }
-                  )
-            })
+                    await this.notificationService.sendPushNotification(
+                        plan.user,
+                        '🎉 Plan completed Successfully',
+                        `Your target goal for the ${plan.plan.name} plan has been achieved! 
+                        Congratulations on reaching your savings goal! your total savings and 
+                        interest has been deposited to your wallet 🎉`,
+                        { type: 'subscription_created' }
+                      )
+                } catch (error) {
+                    logger.error(`Error calculating interest for subscriber ${plan.id}:`, error)
+                }
+            }
 
         } catch (error) {
             logger.error(error)

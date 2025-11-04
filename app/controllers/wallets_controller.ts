@@ -61,6 +61,15 @@ export default class WalletsController {
   }
 
 
+  /**
+   * @createWithdrawal
+   * @description Create withdrawal request
+   * @requestBody {"amount": 10000, "bank": 1, "password": "password123"}
+   * @responseBody 200 - {"message": "Withdrawal request created successfully", "data": {"id": 1, "amount": 10000, "status": "pending"}}
+   * @responseBody 400 - {"message": "Insufficient balance"}
+   * @responseBody 401 - {"message": "Invalid password"}
+   * @responseBody 500 - {"message": "An error occurred while processing your withdrawal request"}
+   */
   async createWithdrawal({ auth, request, response }: HttpContext) {
     try {
       const user = await auth.user!;
@@ -137,7 +146,13 @@ export default class WalletsController {
     }
   }
 
-  // complete transfer 
+  /**
+   * @completeTransfer
+   * @description Complete withdrawal transfer with PIN verification
+   * @requestBody {"withdrawalId": 1, "pin": "1234"}
+   * @responseBody 200 - {"message": "Withdrawal Request Successful"}
+   * @responseBody 400 - {"message": "Invalid User pin"}
+   */
   async completeTransfer({ auth, request, response }: HttpContext) {
     const { withdrawalId, pin } = request.all();
     const user = auth.user!
@@ -189,6 +204,12 @@ export default class WalletsController {
     return response.status(200).send({ message: 'Withdrwal Request Successfull' })
   }
 
+  /**
+   * @handlePaystackWebhook
+   * @description Handle Paystack webhook events
+   * @responseBody 200 - {"message": "Webhook processed successfully"}
+   * @responseBody 400 - {"error": "Invalid signature"}
+   */
   async handlePaystackWebhook({ request, response }: HttpContext) {
     const signature = request.header('x-paystack-signature')
     const body: any = await request.raw()
@@ -200,43 +221,40 @@ export default class WalletsController {
     const eventData = JSON.parse(body)
     const event = eventData.event
     const transactionData = eventData.data
+    const reference = transactionData.reference
+
+    // Import WalletService
+    const WalletService = (await import('#services/walletService')).default
 
 
-    // user add new card and charge was succefull
-
+    // user add new card and charge was successful
     if (event == 'charge.success' && transactionData.channel == 'card' && transactionData.metadata?.custom_fields?.[0]?.variable_name == 'Add_Card') {
-      console.log('na me trigger')
       const user = await User.findByOrFail('email', transactionData.customer.email)
 
-      await UserCard.create({
-        cardType: transactionData.authorization.card_type,
-        expire: `${transactionData.authorization.exp_month}/ ${transactionData.authorization.exp_year}`,
-        lastFour: transactionData.authorization.last4,
-        token: transactionData.authorization.authorization_code,
-        signature: transactionData.authorization.signature,
-        userId: user.id
-      })
-      const wallet = await Wallet.findByOrFail('user_id', user.id)
-
-      const newBalance = (Number(wallet.amount) + (transactionData.amount / 100)); // Update balance
-      await wallet.merge({ amount: newBalance }).save();
-
-      await WalletTransaction.create({
-        amount: 100,
-        transactionType: 'DEPOSIT',
-        userId: user.id,
-        reference: transactionData.reference,
-        walletId: wallet.id,
-        totalAmount: 100,
-        transactionDate: transactionData.paidAt,
-      })
-
-      await this.notificationService.sendPushNotification(
-        user,
-        '💳 Card Added Successfully',
-        `Your card has been successfully added, ₦${transactionData.amount / 100}.00 has been added to your wallet ✅`,
-        { type: 'card_added' }
+      const result = await WalletService.processDeposit(
+        user.id,
+        transactionData.amount / 100,
+        reference,
+        { type: 'card_addition', paystackData: transactionData }
       )
+
+      if (result.success) {
+        await UserCard.create({
+          cardType: transactionData.authorization.card_type,
+          expire: `${transactionData.authorization.exp_month}/ ${transactionData.authorization.exp_year}`,
+          lastFour: transactionData.authorization.last4,
+          token: transactionData.authorization.authorization_code,
+          signature: transactionData.authorization.signature,
+          userId: user.id
+        })
+
+        await this.notificationService.sendPushNotification(
+          user,
+          '💳 Card Added Successfully',
+          `Your card has been successfully added, ₦${transactionData.amount / 100}.00 has been added to your wallet ✅`,
+          { type: 'transaction' }
+        )
+      }
     }
 
     //subscription.create
@@ -247,79 +265,54 @@ export default class WalletsController {
         user,
         '🎉 Subscription Successful',
         `Your subscription to the ${transactionData.plan.name} plan! Your next billing date is ${transactionData.next_payment_date}. Welcome aboard! 🚀"`,
-        { type: 'subscription_created' }
+        { type: 'transaction' }
       )
     }
 
     // user fund a plan via card or any means
     if (event == 'charge.success' && transactionData.metadata?.plan_id) {
-      console.log('na me 2 trigger')
-
       const user = await User.findByOrFail('email', transactionData.customer.email)
       const plan = await Plan.findByOrFail('plan_code', transactionData.metadata.plan_id)
 
-
-      // Record plan transaction
-      await PlanTransaction.create({
-        userId: user?.id,
-        amount: transactionData.amount / 100,
-        transactionType: 'DEPOSIT',
-        receiptId: transactionData.reference,
-        transactionId: transactionData.id,
-        planId: plan.id
-      })
-
-      await PlanSubscriber
-        .query()
-        .where('user_id', user.id)
-        .increment('currentAmount', Number(transactionData.amount / 100))
-
-      // Fetch the updated record to confirm
-      const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
-      console.log('Updated amount:', updatedSubscriber.currentAmount)
-
-      // Send notification
-      await this.notificationService.sendPushNotification(
-        user,
-        '💰 Plan Payment Successful',
-        `Your payment of ₦${transactionData.amount / 100} for ${plan.name} was successful. Your new plan balance is ₦${planSubscriber.currentAmount}. Keep saving! 🎯`,
-        { type: 'plan_payment' }
+      const result = await WalletService.processPlanPayment(
+        user.id,
+        plan.id,
+        transactionData.amount / 100,
+        reference,
+        { type: 'direct_payment', paystackData: transactionData }
       )
+
+      if (result.success) {
+        await this.notificationService.sendPushNotification(
+          user,
+          '💰 Plan Payment Successful',
+          `Your payment of ₦${transactionData.amount / 100} for ${plan.name} was successful. Your new plan balance is ₦${result.subscription?.currentAmount}. Keep saving! 🎯`,
+          { type: 'transaction' }
+        )
+      }
     }
 
-    // User was charged for a plan
+    // User was charged for a plan subscription
     if (event == 'charge.success' && Object.keys(transactionData.plan).length > 0 && transactionData.plan.constructor == Object) {
-      console.log('na me 3 trigger')
-
       const user = await User.findByOrFail('email', transactionData.customer.email)
-
       const plan = await Plan.findByOrFail('plan_code', transactionData.plan.plan_code)
-      // add transaction to saving 
 
-      await PlanSubscriber
-        .query()
-        .where('user_id', user.id)
-        .increment('currentAmount', Number(transactionData.amount / 100))
-
-      // Fetch the updated record to confirm
-      const updatedSubscriber = await PlanSubscriber.findByOrFail('user_id', user?.id)
-      console.log('Updated amount:', updatedSubscriber.currentAmount)
-
-      await PlanTransaction.create({
-        userId: user?.id,
-        amount: transactionData.amount / 100,
-        transactionType: 'DEPOSIT',
-        receiptId: transactionData.reference,
-        transactionId: transactionData.id,
-        planId: plan.id,
-      })
-
-      await this.notificationService.sendPushNotification(
-        user,
-        '💸 Subscription Charge',
-        `You've been charged ₦${transactionData.amount / 100} for your ${transactionData.plan.name} subscription. Thank you for staying with us! 🙏`,
-        { type: 'subcription' }
+      const result = await WalletService.processPlanPayment(
+        user.id,
+        plan.id,
+        transactionData.amount / 100,
+        reference,
+        { type: 'subscription_charge', paystackData: transactionData }
       )
+
+      if (result.success) {
+        await this.notificationService.sendPushNotification(
+          user,
+          '💸 Subscription Charge',
+          `You've been charged ₦${transactionData.amount / 100} for your ${transactionData.plan.name} subscription. Thank you for staying with us! 🙏`,
+          { type: 'transaction' }
+        )
+      }
     }
 
     // Plan Canceled
@@ -330,62 +323,44 @@ export default class WalletsController {
         user,
         '😢 Subscription Canceled',
         `Your subscription to the ${transactionData.plan.name} plan has been canceled. We are sad to see you go! 💔`,
-        { type: 'subscription' }
+        { type: 'transaction' }
       )
     }
 
     // charge success from a dedicated_nuban
     if (event == "charge.success" && transactionData.channel == "dedicated_nuban") {
-
       const user = await User.findByOrFail('email', transactionData.customer.email)
 
-
-      let wallet = await Wallet.findBy('user_id', user.id)
-
-      if (wallet) {
-        // Increment existing wallet amount
-        await wallet.merge({
-          amount: wallet.amount + Number(transactionData.amount / 100)
-        }).save()
-      } else {
-        // Create new wallet with initial amount
-       wallet =  await Wallet.create({
-          user_id: user.id,
-          amount: Number(transactionData.amount / 100)
-        })
-      }
-
-      // save transaction to history
-      const transaction = new WalletTransaction()
-      transaction.walletId = wallet?.id
-      transaction.amount = transactionData.amount / 100
-      transaction.transactionType = 'DEPOSIT'
-      transaction.reference = transactionData.reference
-      transaction.userId = user.id
-      await transaction.save()
-
-      await this.notificationService.sendPushNotification(
-        user,
-        '💰 Savevest Wallet Deposit',
-        `A deposit of ₦${transactionData.amount / 100} has been added to your wallet. 
-        Your new Savevest wallet balance is ₦${updatedWallet.amount}. Keep growing! 📈 `,
-        { type: 'deposit_successful' }
+      const result = await WalletService.processDeposit(
+        user.id,
+        transactionData.amount / 100,
+        reference,
+        { type: 'bank_transfer', paystackData: transactionData }
       )
+
+      if (result.success) {
+        await this.notificationService.sendPushNotification(
+          user,
+          '💰 Savevest Wallet Deposit',
+          `A deposit of ₦${transactionData.amount / 100} has been added to your wallet. Your new Savevest wallet balance is ₦${result.wallet?.amount}. Keep growing! 📈`,
+          { type: 'transaction' }
+        )
+      }
     }
 
     if (event == "customeridentification.success"){
-      const user = await User.findByOrFail('email', transactionData.customer.email)
-      await user.merge({ kyc: true }).save()
+      const user = await User.findByOrFail('email', transactionData.email)
+      await user.merge({ bvn: true, kyc: true }).save()
       await this.notificationService.sendPushNotification(
         user,
-        '🎉 KYC Completed Successful',
+        '🎉 BVN Completed Successful',
         `Your BVN has been approved successfully`,
-        { type: 'subscription_created' }
+        { type: 'security' }
       )
     }
 
     if (event == "customeridentification.failed"){
-      const user = await User.findByOrFail('email', transactionData.customer.email)
+      const user = await User.findByOrFail('email', transactionData.email)
       await this.notificationService.sendPushNotification(
         user,
         'BVN failed ',
@@ -393,9 +368,15 @@ export default class WalletsController {
         { type: 'verifivationa_failed' }
       )
     }
+
     return response.status(200).send({ message: 'Webhook processed successfully' })
   }
 
+  /**
+   * @handleSmileIdWebhook
+   * @description Handle SmileID webhook events for KYC verification
+   * @responseBody 200 - Webhook processed
+   */
   async handleSmileIdWebhook({ request, response }: HttpContext) {
     console.log(request.raw)
     const body = request.body()
@@ -407,7 +388,7 @@ export default class WalletsController {
         user,
         '🎉 KYC Completed Successful',
         `Your BVN has been approved successfully`,
-        { type: 'subscription_created' }
+        { type: 'security' }
       )
     } else {
       await user?.merge({ kyc: false }).save()
@@ -416,7 +397,9 @@ export default class WalletsController {
 
 
   /**
-   * Display a list of resource
+   * @index
+   * @description Get all wallets (admin only)
+   * @responseBody 200 - {"wallet": [{"id": 1, "amount": 50000, "user_id": 1}]}
    */
   async index({ response }: HttpContext) {
     const wallet = await Wallet.all()
@@ -424,8 +407,9 @@ export default class WalletsController {
   }
 
   /**
-   * Display form to create a new record
-   * 
+   * @create
+   * @description Create wallet for user
+   * @responseBody 201 - Wallet created successfully
    */
   async create({ auth, response }: HttpContext) {
 
@@ -436,8 +420,14 @@ export default class WalletsController {
     })
     return response.status(201)
   }
+
+
   /**
-   * Fund Wallet
+   * @fundWallet
+   * @description Fund user wallet via Paystack
+   * @requestBody {"amount": 10000}
+   * @responseBody 200 - {"message": "Deposit successful", "data": {"authorization_url": "https://checkout.paystack.com/..."}}
+   * @responseBody 500 - {"message": "An error occurred while processing your request"}
    */
   async fundWallet({ auth, request, response }: HttpContext) {
     try {
@@ -480,8 +470,11 @@ export default class WalletsController {
     }
   }
 
+  
   /**
-   * Show individual record
+   * @show
+   * @description Get user wallet details
+   * @responseBody 200 - {"wallet": {"id": 1, "amount": 50000, "user_id": 1}}
    */
   async show({ auth, response }: HttpContext) {
     const user = await auth.user!
@@ -489,6 +482,11 @@ export default class WalletsController {
     return response.status(200).json({ wallet })
   }
 
+  /**
+   * @fetchWalletTransactions
+   * @description Get user wallet transaction history
+   * @responseBody 200 - {"transactions": [{"id": 1, "amount": 10000, "transactionType": "DEPOSIT", "status": "success"}]}
+   */
   async fetchWalletTransactions({ auth, response }: HttpContext) {
     const user = await auth.user!
     const paystackService = new PaystackService();
@@ -530,7 +528,9 @@ export default class WalletsController {
   }
 
   /**
-   * Edit individual record
+   * @edit
+   * @description Edit wallet (internal use)
+   * @requestBody {"amount": 10000}
    */
   async edit({ auth, request }: HttpContext) {
     const user = await auth.user!
@@ -546,9 +546,11 @@ export default class WalletsController {
   }
 
   /**
-   * Handle form submission for the edit action
+   * @createDVA
+   * @description Create Dedicated Virtual Account for user
+   * @responseBody 200 - {"userBank": {"id": 1, "accountNumber": "1234567890", "bankName": "Wema Bank"}}
+   * @responseBody 400 - {"message": "Please complete your KYC"}
    */
-
   async createDVA({ auth, response }: HttpContext) {
     const user = await auth.user!
     if(!user.kyc){
@@ -567,7 +569,8 @@ export default class WalletsController {
   }
 
   /**
-   * Delete record
+   * @destroy
+   * @description Delete wallet record
    */
   async destroy({ }: HttpContext) { }
 }

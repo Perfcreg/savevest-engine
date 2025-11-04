@@ -10,6 +10,13 @@ export default class NotificationController {
   }
 
 
+  /**
+   * @updateDeviceId
+   * @description Update user's device ID for push notifications
+   * @requestBody {"token": "ExponentPushToken[abc123]"}
+   * @responseBody 200 - {"message": "Device ID updated successfully"}
+   * @responseBody 500 - {"error": "Failed to update device ID"}
+   */
   public async updateDeviceId({ auth, request, response }: HttpContext) {
     const { token } = request.only(['token'])
     try {
@@ -23,6 +30,13 @@ export default class NotificationController {
     }
   }
 
+  /**
+   * @sendReferralNotification
+   * @description Send referral notification to user
+   * @requestBody {"userId": 1, "referrerName": "John Doe"}
+   * @responseBody 200 - {"message": "Referral notification sent successfully"}
+   * @responseBody 500 - {"error": "Failed to send referral notification"}
+   */
   public async sendReferralNotification({ request, response }: HttpContext) {
     const { userId, referrerName } = request.only(['userId', 'referrerName'])
 
@@ -36,6 +50,13 @@ export default class NotificationController {
     }
   }
 
+  /**
+   * @sendNewSubscriberNotification
+   * @description Send new subscriber notification
+   * @requestBody {"userId": 1, "planName": "Monthly Savings"}
+   * @responseBody 200 - {"message": "New subscriber notification sent successfully"}
+   * @responseBody 500 - {"error": "Failed to send new subscriber notification"}
+   */
   public async sendNewSubscriberNotification({ request, response }: HttpContext) {
     const { userId, planName } = request.only(['userId', 'planName'])
 
@@ -49,6 +70,13 @@ export default class NotificationController {
     }
   }
 
+  /**
+   * @sendDepositNotification
+   * @description Send deposit notification to user
+   * @requestBody {"userId": 1, "amount": 10000}
+   * @responseBody 200 - {"message": "Deposit notification sent successfully"}
+   * @responseBody 500 - {"error": "Failed to send deposit notification"}
+   */
   public async sendDepositNotification({ request, response }: HttpContext) {
     const { userId, amount } = request.only(['userId', 'amount'])
 
@@ -62,6 +90,13 @@ export default class NotificationController {
     }
   }
 
+  /**
+   * @sendWithdrawalNotification
+   * @description Send withdrawal notification to user
+   * @requestBody {"userId": 1, "amount": 5000}
+   * @responseBody 200 - {"message": "Withdrawal notification sent successfully"}
+   * @responseBody 500 - {"error": "Failed to send withdrawal notification"}
+   */
   public async sendWithdrawalNotification({ request, response }: HttpContext) {
     const { userId, amount } = request.only(['userId', 'amount'])
 

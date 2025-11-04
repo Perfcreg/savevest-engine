@@ -10,12 +10,12 @@ const dbConfig = defineConfig({
         host: env.get('DB_HOST'),
         port: env.get('DB_PORT'),
         user: env.get('DB_USER'),
-        // password:env.get('DB_PASSWORD'),
-        password: 'Perfcreg007$$',
+        password:env.get('DB_PASSWORD'),
+        // password: 'Perfcreg007$$',
         database: env.get('DB_DATABASE'),
-        ssl: {
-            rejectUnauthorized: false, // Adjust based on your SSL requirements
-          },
+        // ssl: {
+        //     rejectUnauthorized: false, // Adjust based on your SSL requirements
+        //   },
        
 
       },

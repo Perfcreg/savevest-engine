@@ -1,33 +1,27 @@
-FROM node:20-alpine AS base
+FROM node:20-alpine
 
-# Install dependencies
-FROM base AS deps
 WORKDIR /app
-COPY package.json yarn.lock* package-lock.json* ./
-RUN if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
-    elif [ -f package-lock.json ]; then npm ci; \
-    else npm install; fi
 
-# Build stage
-FROM base AS build
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev for build)
+RUN npm install
+
+# Copy source code
 COPY . .
+
+# Build the application
 RUN npm run build
 
-# Production stage
-FROM base AS production
-WORKDIR /app
+# Remove dev dependencies
+RUN npm prune --production
+
+# Set environment
 ENV NODE_ENV=production
-
-# Copy built application
-COPY --from=build /app/build ./
-COPY --from=build /app/package.json ./package.json
-
-# Install production dependencies
-RUN if [ -f yarn.lock ]; then yarn install --production --frozen-lockfile && yarn cache clean; \
-    elif [ -f package-lock.json ]; then npm ci --only=production && npm cache clean --force; \
-    else npm install --only=production && npm cache clean --force; fi
+ENV PORT=3333
 
 EXPOSE 3333
-CMD ["node", "bin/server.js"]
+
+# Start the application
+CMD ["npm", "start"]

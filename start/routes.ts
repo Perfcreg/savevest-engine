@@ -34,6 +34,10 @@ router.get('/', ({ request, response }) => {
   response.send({ hello: 'world' })
 })
 
+router.get('/health', ({ response }) => {
+  return response.ok({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
 
 router
   .group(() => {

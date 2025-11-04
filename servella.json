@@ -1,17 +1,5 @@
 {
   "name": "savevest-backend",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "."
-  },
-  "deploy": {
-    "port": 3333,
-    "healthcheck": "/health",
-    "start_command": "node build/bin/server.js"
-  },
-  "env": {
-    "NODE_ENV": "production",
-    "PORT": "3333",
-    "HOST": "0.0.0.0"
-  }
+  "port": 3333,
+  "healthcheck": "/health"
 }

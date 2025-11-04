@@ -66,8 +66,7 @@ export default class AuthController {
       } else {
         newUser.token = token
         const smsService = new SmsService();
-        // await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
-        console.log(token)
+        await smsService.sendTokenVerificationSMS(`+234${payload.phone}`, token)
         await newUser.save()
       }
       return response.status(201).send({ message: "User created Successfully" })
@@ -305,15 +304,14 @@ export default class AuthController {
   async verify2fa({ request, response }: HttpContext) {
     const { token } = await request.validateUsing(verifyTokenValidator)
     try {
-      const user = await User.findByOrFail('id',request.input('userId'))
-      if (user.pin == token) {
+      const user = await User.findByOrFail('id', request.input('userId'))
+      if (user.pin === token) {
         const accessToken = await User.accessTokens.create(user)
         return response.status(200).send({ accessToken })
-      }
-       else {
+      } else {
         throw new Error("Invalid Pin")
       }
-    } catch (e) {
+    } catch (e: any) {
       return response.forbidden(e.message)
     }
   }

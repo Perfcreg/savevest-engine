@@ -138,7 +138,7 @@ export default class WalletsController {
         message: "Withdrawal request created successfully",
         data: withdrawal,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to create withdrawal:", error);
       return response.status(500).json({
         message: "An error occurred while processing your withdrawal request"
@@ -462,7 +462,7 @@ export default class WalletsController {
         message: "Deposit successful",
         data: data
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to fund wallet:", error);
       return response.status(500).json({
         message: "An error occurred while processing your request"

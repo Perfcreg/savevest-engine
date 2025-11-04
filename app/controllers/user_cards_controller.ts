@@ -275,8 +275,8 @@ export default class UserCardController {
       return response.status(200).send({
         message: 'Card deleted successfully',
       });
-    } catch (error) {
-      return response
+    } catch (error: any) {
+      return response.status(400).send({ message: error.message });
     }
   }
 

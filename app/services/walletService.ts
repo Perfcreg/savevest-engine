@@ -10,7 +10,7 @@ export default class WalletService {
   /**
    * Process wallet deposit with idempotency
    */
-  static async processDeposit(userId: number, amount: number, reference: string, metadata: any = {}) {
+  static async processDeposit(userId: number, amount: number, reference: string, metadata: Record<string, any> = {}) {
     return Database.transaction(async (trx) => {
       // Check if transaction already exists
       const existingTransaction = await WalletTransaction.query({ client: trx })
@@ -55,7 +55,7 @@ export default class WalletService {
   /**
    * Process wallet withdrawal with balance check
    */
-  static async processWithdrawal(userId: number, amount: number, reference: string, metadata: any = {}) {
+  static async processWithdrawal(userId: number, amount: number, reference: string, metadata: Record<string, any> = {}) {
     return Database.transaction(async (trx) => {
       // Check for duplicate
       const existingTransaction = await WalletTransaction.query({ client: trx })

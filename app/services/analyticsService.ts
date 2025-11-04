@@ -23,7 +23,14 @@ export default class AnalyticsService {
     valueField = '*',
     aggregateType = 'count',
     additionalFilters = () => { },
-    formatTotal = (value) => value,
+    formatTotal = (value: any) => value,
+  }: {
+    queryCallback: () => any;
+    timeField?: string;
+    valueField?: string;
+    aggregateType?: 'count' | 'sum';
+    additionalFilters?: (query: any) => void;
+    formatTotal?: (value: any) => any;
   }) {
     const now = DateTime.now()
     const lastMonth = now.minus({ months: 1 })
@@ -75,11 +82,11 @@ export default class AnalyticsService {
         ? await monthlyQuery.count(`${valueField} as total`)
         : await monthlyQuery.sum(`${valueField} as total`)
 
-      monthlyData.push(monthlyResult[0].$extras.total || 0)
+      monthlyData.push(monthlyResult[0]?.$extras?.total || 0)
     }
 
-    const thisMonthValue = parseFloat(thisMonthData[0].$extras.total || 0)
-    const lastMonthValue = parseFloat(lastMonthData[0].$extras.total || 0)
+    const thisMonthValue = parseFloat(thisMonthData[0]?.$extras?.total || '0')
+    const lastMonthValue = parseFloat(lastMonthData[0]?.$extras?.total || '0')
 
     // Calculate growth percentage
     let growthPercentage
@@ -94,7 +101,7 @@ export default class AnalyticsService {
     const isIncrease = thisMonthValue >= lastMonthValue
 
     return {
-      total: formatTotal(totalData[0].$extras.total || 0),
+      total: formatTotal(totalData[0]?.$extras?.total || 0),
       growthPercentage,
       isIncrease,
       graphData: monthlyData
@@ -181,11 +188,11 @@ export default class AnalyticsService {
         .whereBetween('created_at', [startOfDay, endOfDay])
         .sum('amount as total')
 
-      dailyWithdrawalAmounts.push(dailyAmount[0].$extras.total || 0)
+      dailyWithdrawalAmounts.push(dailyAmount[0]?.$extras?.total || 0)
     }
 
-    const thisWeekAmount = parseFloat(thisWeekWithdrawals[0].$extras.total || 0)
-    const lastWeekAmount = parseFloat(lastWeekWithdrawals[0].$extras.total || 0)
+    const thisWeekAmount = parseFloat(thisWeekWithdrawals[0]?.$extras?.total || '0')
+    const lastWeekAmount = parseFloat(lastWeekWithdrawals[0]?.$extras?.total || '0')
 
     // Calculate growth percentage
     let growthPercentage
@@ -200,7 +207,7 @@ export default class AnalyticsService {
     const isIncrease = thisWeekAmount >= lastWeekAmount
 
     return {
-      total: totalWithdrawals[0].$extras.total || 0,
+      total: totalWithdrawals[0]?.$extras?.total || 0,
       growthPercentage,
       isIncrease,
       graphData: dailyWithdrawalAmounts

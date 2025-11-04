@@ -51,7 +51,7 @@ export default class SavingsController {
         message: 'Deposit initiated successfully',
         data: savingsTransaction,
       });
-    } catch (error) {
+    } catch (error: any) {
       return response.forbidden(error.message);
     }
   }
@@ -68,7 +68,7 @@ export default class SavingsController {
     try {
       await user.load('savingsTransaction');
       return response.status(200).send(user.savingsTransaction);
-    } catch (error) {
+    } catch (error: any) {
       return response.forbidden(error.message);
     }
   }

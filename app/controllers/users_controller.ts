@@ -24,7 +24,7 @@ export default class UsersController {
                 message: 'User incentives retrieved successfully',
                 data: { totalIncentives }
             })
-        } catch (error) {
+        } catch (error: any) {
             return response.status(500).json({
                 message: 'Error retrieving user incentives',
                 error: error.message

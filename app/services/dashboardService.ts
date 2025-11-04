@@ -27,9 +27,9 @@ export default class DashboardService {
       .groupByRaw('HOUR(created_at)')
       .orderBy('created_at')
 
-    return dailyFunds.map(fund => ({
+    return dailyFunds.map((fund: any) => ({
       hour: DateTime.fromJSDate(fund.createdAt).toFormat('HH:00'),
-      amount: Number(fund?.totalAmount || 0)
+      amount: Number(fund?.$extras?.totalAmount || 0)
     }))
   }
 
@@ -51,9 +51,9 @@ export default class DashboardService {
       .groupByRaw('DATE(created_at)')
       .orderBy('created_at')
 
-    return monthlyFunds.map(fund => ({
+    return monthlyFunds.map((fund: any) => ({
       date: DateTime.fromJSDate(fund.created_at).toFormat('yyyy-MM-dd'),
-      amount: Number(fund.totalAmount || 0)
+      amount: Number(fund.$extras?.totalAmount || 0)
     }))
   }
 

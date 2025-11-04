@@ -21,7 +21,7 @@ export default class UserBanksController {
         message: 'Bank account found',
         data: bank,
       });
-    } catch (error) {
+    } catch (error: any) {
       return response.status(400).send({ message: error.message });
     }
   }
@@ -66,7 +66,7 @@ export default class UserBanksController {
         message: 'Bank account added successfully',
         data: userBank,
       });
-    } catch (error) {
+    } catch (error: any) {
       return response.status(400).send({ message: error.message });
     }
   }
@@ -100,7 +100,7 @@ export default class UserBanksController {
         message: 'Bank account updated successfully',
         data: userBank,
       });
-    } catch (error) {
+    } catch (error: any) {
       return response.status(400).send({ message: error.message });
     }
   }
@@ -116,11 +116,11 @@ export default class UserBanksController {
     try {
       const bankId = params.id
       const userBank = await UserBank.findOrFail(bankId);
-      userBank.delete()
+      await userBank.delete()
       return response.status(200).send({
         message: 'Bank account deleted',
       });
-    } catch (error) {
+    } catch (error: any) {
       return response.status(400).send({ message: error.message });
 
     }

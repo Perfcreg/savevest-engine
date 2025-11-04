@@ -10,11 +10,6 @@ import PlanType from '#models/plan_type'
 import DashboardService from '#services/dashboardService'
 import AnalyticsService from '#services/analyticsService'
 export default class AdminController {
-  // These private properties are used in the constructor and throughout the class
-  // The analyticsService property appears unused because static methods are being called directly on the AnalyticsService class
-  // instead of using the instance property. The dashboardService property is used in getUsers() method.
-
-  
   /**
    * @getDashboardData
    * @description Get admin dashboard analytics data
@@ -167,7 +162,7 @@ export default class AdminController {
         .orderBy('created_at')
 
       const chartData = dailyFunds.map(fund => ({
-        hour: DateTime.fromISO(fund?.createdAt).toFormat('HH:00'),
+        hour: DateTime.fromJSDate(fund.createdAt).toFormat('HH:00'),
         amount: Number(fund.$extras.totalAmount)
       }))
 
@@ -199,7 +194,7 @@ export default class AdminController {
         .orderBy('created_at')
 
       const chartData = monthlyFunds.map(fund => ({
-        date: DateTime.fromISO(fund.createdAt?.toISO()).toFormat('yyyy-MM-dd'),
+        date: DateTime.fromJSDate(fund.createdAt).toFormat('yyyy-MM-dd'),
         amount: Number(fund.$extras.totalAmount)
       }))
 

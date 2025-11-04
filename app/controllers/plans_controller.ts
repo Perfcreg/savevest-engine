@@ -272,14 +272,14 @@ export default class PlansController {
       if (diff < 30) {
         throw new Error('This savings plan is less than 30 days and cannot be broken');
       }
-      const response = await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
+      const paystackResponse = await this.paystackService.cancelSubscription(plan?.subscriptionCode || '', plan?.emailToken || '')
 
       await plan.merge({
         endDate: DateTime.now(),
         status: "Cancelled"
       }).save();
 
-      const wallet = await Wallet
+      await Wallet
         .query()
         .where('user_id', user.id)
         .increment('amount', Number(plan?.currentAmount))
@@ -289,15 +289,16 @@ export default class PlansController {
       console.log('Updated amount:', updatedSubscriber.currentAmount)
 
       const realPlan = await Plan.findBy('id', plan?.planId)
+      const userWallet = await Wallet.findBy('user_id', user.id)
 
       await WalletTransaction.create({
         userId: user.id,
-        amount: plan?.currentAmount,
+        amount: plan?.currentAmount || 0,
         transactionType: 'DEPOSIT',
-        reference: realPlan?.planCode,
-        walletId: wallet?.id
+        reference: realPlan?.planCode || '',
+        walletId: userWallet?.id || 0
       })
-      return response.status(200).json({ message: 'Plan unsubscribed successfull' });
+      return response.status(200).json({ message: 'Plan unsubscribed successfully' });
 
     } catch (error) {
       return response.forbidden(error.message);

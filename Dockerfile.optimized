@@ -1,0 +1,52 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install yarn globally and configure for better network handling
+RUN npm install -g yarn && \
+    yarn config set network-timeout 300000 && \
+    yarn config set registry https://registry.yarnpkg.com
+
+# Copy package files and install dependencies
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile --network-timeout 300000
+
+# Copy source and build
+COPY . .
+RUN yarn build
+
+# Clean up dev dependencies and install only production dependencies in build
+WORKDIR /app/build
+RUN yarn install --production --frozen-lockfile --network-timeout 300000
+
+# Go back to app directory and clean up
+WORKDIR /app
+RUN rm -rf node_modules && \
+    rm -rf src && \
+    rm -rf tests
+
+# Copy and set permissions for startup script
+RUN chmod +x start.sh
+
+# Set production environment
+ENV NODE_ENV=production
+ENV PORT=3333
+ENV HOST=0.0.0.0
+
+# Create non-root user for security
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S savevest -u 1001 -G nodejs
+
+# Change ownership of app directory
+RUN chown -R savevest:nodejs /app
+
+USER savevest
+
+EXPOSE 3333
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD node -e "require('http').get('http://localhost:3333/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
+
+# Use startup script
+CMD ["./start.sh"]
